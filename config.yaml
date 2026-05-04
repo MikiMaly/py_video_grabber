@@ -1,4 +1,4 @@
-download_dir: "D:/grabber/testvids"
+download_dir: "./downloads"
 max_workers: 1
 timeout_sec: 60
 

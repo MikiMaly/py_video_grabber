@@ -1,11 +1,11 @@
 import argparse
 import csv
+import json
 import queue
 import re
 import shutil
 import threading
 import time
-from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -14,17 +14,15 @@ import yaml
 from yt_dlp import YoutubeDL
 
 # =========================
-# v6.4-boxed
-# - boxed UI with EXACT padding:
-#     "| " + text_area + " |"
-#   => exactly ONE space before right border always
-# - header: CSV -> Output -> Workers
-# - ENQ starts at the same column where ELAP starts in active row
-# - queue_limit + pending + feeder
-# - DONE path shortener to fit box width
+# v6.5-boxed
+# - meaningful filenames: job_id_%(title)s.mp4
+# - auto-retry with exponential backoff (max_retries, retry_base_delay)
+# - persistent state: grabber_state.json (resume after restart)
+# - graceful shutdown: Ctrl+C waits for active downloads to finish
+# - priority: type "! <jid>" to bump a pending job to front
+# - URL dedup: same URL won't be added twice while active
 # =========================
 
-# Colors (Windows-friendly)
 try:
     from colorama import init as colorama_init
     colorama_init()
@@ -50,6 +48,7 @@ DIM = "2"
 CSI = "\x1b["
 URL_FINDER = re.compile(r"https?://[^\s,;\"']+", re.IGNORECASE)
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+INVALID_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 def strip_ansi(s: str) -> str:
@@ -66,6 +65,13 @@ def ansi_home():
 
 def ansi_clear_to_end():
     print(CSI + "J", end="")
+
+
+def sanitize_filename(name: str, max_len: int = 80) -> str:
+    name = INVALID_CHARS_RE.sub("_", name)
+    name = re.sub(r"_+", "_", name)
+    name = re.sub(r"\s+", " ", name).strip().rstrip(". ")
+    return name[:max_len] if len(name) > max_len else name
 
 
 def load_config(path: str) -> dict:
@@ -94,6 +100,10 @@ def load_config(path: str) -> dict:
 
     cfg.setdefault("queue_limit", 30)
     cfg.setdefault("ui_width", 110)
+
+    cfg.setdefault("max_retries", 3)
+    cfg.setdefault("retry_base_delay", 10)
+    cfg.setdefault("state_file", "grabber_state.json")
 
     return cfg
 
@@ -227,9 +237,14 @@ class Job:
 
     meta_done: bool = False
 
+    title: str = ""
+    retry_count: int = 0
+    priority: int = 0
+    retry_after: float = 0.0
+
 
 class GrabberDaemon:
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, state_path: Path):
         self.cfg = cfg
         self.out_dir = Path(cfg["download_dir"]).expanduser().resolve()
         self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -240,7 +255,7 @@ class GrabberDaemon:
         self.stop_event = threading.Event()
 
         self.meta_q: queue.Queue[str] = queue.Queue()
-        self.pending: deque[str] = deque()
+        self.pending: list[str] = []
 
         self._jid_counter = 0
 
@@ -249,16 +264,16 @@ class GrabberDaemon:
         self.W_TOTAL = 9
 
         self.queue_limit = int(cfg.get("queue_limit", 30))
+        self.max_retries = int(cfg.get("max_retries", 3))
+        self.retry_base_delay = float(cfg.get("retry_base_delay", 10))
 
         self.csv_loaded_from: str = ""
         self.csv_loaded_count: int = 0
 
         self.ui_width_cfg = int(cfg.get("ui_width", 110))
 
-    def _next_jid(self) -> int:
-        with self.lock:
-            self._jid_counter += 1
-            return self._jid_counter
+        self._state_path = state_path
+        self._shutting_down: bool = False
 
     def _new_job_id(self, jid: int) -> str:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -273,20 +288,26 @@ class GrabberDaemon:
             return
         j.status = "queued"
         j.enqueued_at = time.time()
+        j.meta_done = False
         self.q.put(job_id)
         if self.cfg.get("prefetch_metadata", True):
             self.meta_q.put(job_id)
 
-    def add_url(self, url: str) -> str:
+    def add_url(self, url: str, priority: int = 0) -> str:
         url = (url or "").strip()
         if not url:
             raise ValueError("empty")
 
-        jid = self._next_jid()
-        job_id = self._new_job_id(jid)
-        job = Job(jid=jid, job_id=job_id, url=url, added_at=time.time())
-
         with self.lock:
+            for j in self.jobs.values():
+                if j.url == url and j.status in ("pending", "queued", "downloading"):
+                    raise ValueError("duplicate")
+
+            self._jid_counter += 1
+            jid = self._jid_counter
+            job_id = self._new_job_id(jid)
+            job = Job(jid=jid, job_id=job_id, url=url, added_at=time.time(), priority=priority)
+
             self.jobs[job_id] = job
             if self._queued_count_locked() < self.queue_limit:
                 self._enqueue_job_into_queue_locked(job_id)
@@ -305,6 +326,94 @@ class GrabberDaemon:
                 continue
         return n
 
+    def bump_priority(self, jid: int) -> str:
+        with self.lock:
+            for j in self.jobs.values():
+                if j.jid == jid:
+                    if j.status == "pending":
+                        j.priority += 1
+                        return f"ok: job {jid} priority -> {j.priority}"
+                    return f"job {jid} is {j.status} (not pending)"
+        return f"job {jid} not found"
+
+    # ---------- state persistence ----------
+
+    def _save_state(self):
+        try:
+            with self.lock:
+                data = {
+                    "version": 1,
+                    "jid_counter": self._jid_counter,
+                    "jobs": [
+                        {
+                            "jid": j.jid,
+                            "job_id": j.job_id,
+                            "url": j.url,
+                            "status": j.status,
+                            "priority": j.priority,
+                            "retry_count": j.retry_count,
+                            "title": j.title,
+                            "added_at": j.added_at,
+                            "finished_at": j.finished_at,
+                            "error": j.error,
+                            "final_path": j.final_path,
+                        }
+                        for j in self.jobs.values()
+                    ],
+                }
+            tmp = self._state_path.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            tmp.replace(self._state_path)
+        except Exception:
+            pass
+
+    def _load_state(self) -> int:
+        if not self._state_path.exists():
+            return 0
+        try:
+            with open(self._state_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return 0
+
+        if data.get("version") != 1:
+            return 0
+
+        restored = 0
+        seen_urls: set[str] = set()
+        max_jid = self._jid_counter
+
+        for jd in data.get("jobs", []):
+            if jd.get("status") not in ("pending", "queued", "downloading"):
+                continue
+
+            url = str(jd.get("url", ""))
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+
+            jid = int(jd["jid"])
+            job = Job(
+                jid=jid,
+                job_id=str(jd["job_id"]),
+                url=url,
+                status="pending",
+                priority=int(jd.get("priority", 0)),
+                retry_count=int(jd.get("retry_count", 0)),
+                title=str(jd.get("title", "")),
+                added_at=float(jd.get("added_at", time.time())),
+            )
+            self.jobs[job.job_id] = job
+            self.pending.append(job.job_id)
+            max_jid = max(max_jid, jid)
+            restored += 1
+
+        self._jid_counter = max_jid
+        return restored
+
+    # ---------- UI helpers ----------
+
     def _bar(self, downloaded: int, total: int, width: int = 24) -> str:
         if total <= 0:
             return "[" + ("?" * width) + "]"
@@ -322,31 +431,23 @@ class GrabberDaemon:
             return txt[-width:]
         return (" " * (width - len(txt))) + txt
 
-    # ---------- boxed UI ----------
     def _ui_width(self) -> int:
         term_w = shutil.get_terminal_size((120, 30)).columns
         w = min(self.ui_width_cfg, term_w)
         return max(80, w)
 
     def _box_border(self, w: int) -> str:
-        # inside is exactly (w-2)
         return "|" + ("-" * (w - 2)) + "|"
 
     def _box_line(self, content: str, w: int) -> str:
-        # EXACT padding model:
-        # |␠ + text_area + ␠|
-        # text_area = w - 4
         text_area = w - 4
         plain = strip_ansi(content)
         if len(plain) > text_area:
-            # truncate (drop colors if needed for safety)
             plain = plain[:text_area]
             content = plain
-
         vis = len(strip_ansi(content))
         if vis < text_area:
             content = content + (" " * (text_area - vis))
-
         return f"| {content} |"
 
     def _render(self, first: bool = False):
@@ -358,35 +459,40 @@ class GrabberDaemon:
                 ansi_clear_to_end()
 
             w = self._ui_width()
-            text_area = w - 4  # must match _box_line()
+            text_area = w - 4
 
             with self.lock:
                 jobs = list(self.jobs.values())
                 qsize = self.q.qsize()
                 fr = int(self.cfg["concurrent_fragments"])
                 meta_pending = self.meta_q.qsize()
-                pending_cnt = len(self.pending)
                 csv_info = self.csv_loaded_from or "none"
                 csv_count = self.csv_loaded_count
                 qlimit = self.queue_limit
                 workers = int(self.cfg["max_workers"])
+                shutting_down = self._shutting_down
 
             active = sum(1 for j in jobs if j.status == "downloading")
             done = sum(1 for j in jobs if j.status == "done")
             fail = sum(1 for j in jobs if j.status == "fail")
             queued = sum(1 for j in jobs if j.status == "queued")
+            pending_status = sum(1 for j in jobs if j.status == "pending")
 
             print(self._box_border(w))
-            print(self._box_line("Video Grabber (paste URL + Enter). Ctrl+C to quit.", w))
+            if shutting_down:
+                hdr = c(f"Video Grabber — SHUTTING DOWN, waiting for {active} active download(s)...", RED)
+            else:
+                hdr = "Video Grabber  |  paste URL + Enter  |  ! <jid> = prioritize  |  Ctrl+C to quit"
+            print(self._box_line(hdr, w))
             print(self._box_border(w))
             print(self._box_line(f"CSV: {csv_info} ({csv_count})", w))
             print(self._box_border(w))
             print(self._box_line(f"Output: {self.out_dir}", w))
             print(self._box_border(w))
             print(self._box_line(
-                f"Workers: {workers} | Frags: {fr} | Queue: {qsize}/{qlimit} | pending={pending_cnt} | "
+                f"Workers: {workers} | Frags: {fr} | Queue: {qsize}/{qlimit} | pending={pending_status} "
                 f"queued={queued} active={active} done={done} fail={fail} | metaQ={meta_pending}",
-                w
+                w,
             ))
             print(self._box_border(w))
 
@@ -398,6 +504,10 @@ class GrabberDaemon:
 
             now = time.time()
 
+            pending_jobs = sorted(
+                [j for j in jobs if j.status == "pending"],
+                key=lambda j: (-j.priority, j.added_at),
+            )
             queued_jobs = sorted([j for j in jobs if j.status == "queued"], key=lambda j: j.enqueued_at)
             active_jobs = sorted([j for j in jobs if j.status == "downloading"], key=lambda j: j.started_at or 0.0)
             done_jobs = sorted([j for j in jobs if j.status == "done"], key=lambda j: j.finished_at or 0.0, reverse=True)
@@ -406,20 +516,17 @@ class GrabberDaemon:
             MAX_LINES = 25
             shown = 0
 
-            # Find ELAP column start (within the visible row content area, not counting "| ")
             elap_col_start = None
             if active_jobs:
                 j0 = active_jobs[0]
                 jid_txt0 = self._pad(f"{j0.jid:04d}", self.W_JID)
                 id_txt0 = self._pad(j0.job_id, self.W_ID)
                 total_txt0 = self._rpad(fmt_size(j0.total), self.W_TOTAL)
-
                 bar_plain = self._bar(j0.downloaded, j0.total)
                 pct_plain = f"{(j0.downloaded / j0.total * 100):5.1f}%" if j0.total else "  ?.?%"
                 sp_plain = f"{(j0.speed / 1024 / 1024):5.1f}MB/s" if j0.speed else "  ?.?MB/s"
                 eta_plain = fmt_hhmmss(j0.eta)
                 elap_plain = fmt_hhmmss((now - j0.started_at) if j0.started_at else 0)
-
                 visible_active = f"{jid_txt0} {id_txt0} {total_txt0} {bar_plain} {pct_plain} {sp_plain} ETA {eta_plain} ELAP {elap_plain}"
                 idx = visible_active.find("ELAP ")
                 if idx != -1:
@@ -431,21 +538,36 @@ class GrabberDaemon:
             def render_job(j: Job):
                 jid_txt = self._pad(f"{j.jid:04d}", self.W_JID)
                 jid_col = c(jid_txt, YELLOW)
-
                 id_txt = self._pad(j.job_id, self.W_ID)
                 id_col = c(id_txt, BLUE)
-
                 total_txt = fmt_size(j.total)
                 total_pad = self._rpad(total_txt, self.W_TOTAL)
                 total_col = c(total_pad, MAGENTA)
 
+                if j.status == "pending":
+                    if j.retry_count > 0 and j.retry_after > now:
+                        wait = fmt_hhmmss(j.retry_after - now)
+                        badge = c(f"[RETRY {j.retry_count}/{self.max_retries} in {wait}]", YELLOW)
+                    elif j.retry_count > 0:
+                        badge = c(f"[RETRY {j.retry_count}/{self.max_retries}]", YELLOW)
+                    elif j.priority > 0:
+                        badge = c(f"[PRIO+{j.priority}]", CYAN)
+                    else:
+                        badge = c("[PENDING]", DIM)
+
+                    right = j.title if j.title else f"ADD {time.strftime('%H:%M:%S', time.localtime(j.added_at))}"
+                    max_right = max(10, text_area - self.W_JID - self.W_ID - self.W_TOTAL - len(strip_ansi(badge)) - 4)
+                    right_txt = c(right[:max_right], DIM)
+
+                    content = f"{jid_col} {id_col} {total_col} {badge} {right_txt}"
+                    print(self._box_line(content, w))
+                    return
+
                 if j.status == "queued":
                     enq = time.strftime("%H:%M:%S", time.localtime(j.enqueued_at)) if j.enqueued_at else "??:??:??"
                     status = c("[QUEUED]", DIM)
-
                     left_plain = f"{jid_txt} {id_txt} {total_pad} [QUEUED]"
                     left_colored = f"{jid_col} {id_col} {total_col} {status}"
-
                     left_len = len(left_plain)
                     spaces = max(1, elap_col_start - left_len)
                     content = left_colored + (" " * spaces) + f"ENQ {enq}"
@@ -456,14 +578,11 @@ class GrabberDaemon:
                     bar = c(self._bar(j.downloaded, j.total), YELLOW)
                     pct = f"{(j.downloaded / j.total * 100):5.1f}%" if j.total else "  ?.?%"
                     sp = c(f"{(j.speed / 1024 / 1024):5.1f}MB/s", GREEN) if j.speed else c("  ?.?MB/s", GREEN)
-
                     eta_txt = fmt_hhmmss(j.eta)
                     elap_txt = fmt_hhmmss((now - j.started_at) if j.started_at else 0)
-
                     eta_color = RED if j.eta_bad else CYAN
                     eta_part = c("ETA ", DIM) + c(eta_txt, eta_color)
                     elap_part = c("ELAP ", DIM) + elap_txt
-
                     content = f"{jid_col} {id_col} {total_col} {bar} {pct} {sp} {eta_part} {elap_part}"
                     print(self._box_line(content, w))
                     return
@@ -475,19 +594,15 @@ class GrabberDaemon:
                             final_bytes = Path(j.final_path).stat().st_size
                         except Exception:
                             final_bytes = 0
-
                     done_total_txt = fmt_size(final_bytes) if final_bytes else fmt_size(j.total)
                     done_total_plain = self._rpad(done_total_txt, self.W_TOTAL)
                     done_total = c(done_total_plain, MAGENTA)
-
                     elap_txt = fmt_hhmmss((j.finished_at - j.started_at) if (j.started_at and j.finished_at) else 0)
                     saved_full = j.final_path or "(path unknown)"
-                    status = c("[DONE]", DIM)
-
+                    status = c("[DONE]", GREEN)
                     prefix_plain = f"{jid_txt} {id_txt} {done_total_plain} [DONE] in {elap_txt} -> "
                     max_path = max(10, text_area - len(prefix_plain))
                     saved = shorten_path_end(saved_full, max_path)
-
                     content = f"{jid_col} {id_col} {done_total} {status} in {elap_txt} -> {c(saved, DIM)}"
                     print(self._box_line(content, w))
                     return
@@ -499,7 +614,7 @@ class GrabberDaemon:
                     print(self._box_line(content, w))
                     return
 
-            for block in (queued_jobs, active_jobs, done_jobs, fail_jobs):
+            for block in (pending_jobs, queued_jobs, active_jobs, done_jobs, fail_jobs):
                 for j in block:
                     if shown >= MAX_LINES:
                         break
@@ -508,12 +623,17 @@ class GrabberDaemon:
                 if shown >= MAX_LINES:
                     break
 
-            remaining = (len(queued_jobs) + len(active_jobs) + len(done_jobs) + len(fail_jobs)) - shown
+            remaining = (
+                len(pending_jobs) + len(queued_jobs) + len(active_jobs) + len(done_jobs) + len(fail_jobs)
+            ) - shown
             if remaining > 0:
                 print(self._box_line(f"... ({remaining} more not shown)", w))
 
             print(self._box_border(w))
-            print(self._box_line("Paste URL here and press Enter:", w))
+            if shutting_down:
+                print(self._box_line(f"Waiting for {active} active download(s)...", w))
+            else:
+                print(self._box_line("Paste URL here and press Enter  |  ! <jid> = bump priority:", w))
             print(self._box_border(w))
             print("> ", end="", flush=True)
 
@@ -523,9 +643,15 @@ class GrabberDaemon:
             print("UI render error:", repr(e))
             print("> ", end="", flush=True)
 
-    # -------- yt-dlp options + threads (unchanged) --------
+    # -------- yt-dlp options --------
+
     def _build_ydl_opts(self, job: Job) -> dict:
-        outtmpl = str(self.out_dir / job.job_id) + ".%(ext)s"
+        if job.title:
+            safe_title = sanitize_filename(job.title)
+            outtmpl = str(self.out_dir / f"{job.job_id}_{safe_title}.%(ext)s")
+        else:
+            outtmpl = str(self.out_dir / f"{job.job_id}_%(title)s.%(ext)s")
+
         headers = {"User-Agent": self.cfg["user_agent"], "Referer": job.url}
         ffmpeg_loc = (self.cfg.get("ffmpeg_path") or "").strip()
 
@@ -592,17 +718,25 @@ class GrabberDaemon:
 
         return opts
 
+    # -------- worker threads --------
+
     def feeder_loop(self):
         while not self.stop_event.is_set():
-            moved = False
-            with self.lock:
-                while self.pending and self._queued_count_locked() < self.queue_limit:
-                    job_id = self.pending.popleft()
-                    if job_id in self.jobs and self.jobs[job_id].status == "pending":
-                        self._enqueue_job_into_queue_locked(job_id)
-                        moved = True
-            if not moved:
-                time.sleep(0.2)
+            if not self._shutting_down:
+                with self.lock:
+                    now = time.time()
+                    eligible = [
+                        jid for jid in self.pending
+                        if jid in self.jobs
+                        and self.jobs[jid].status == "pending"
+                        and self.jobs[jid].retry_after <= now
+                    ]
+                    while eligible and self._queued_count_locked() < self.queue_limit:
+                        best = max(eligible, key=lambda jid: self.jobs[jid].priority)
+                        self.pending.remove(best)
+                        eligible.remove(best)
+                        self._enqueue_job_into_queue_locked(best)
+            time.sleep(0.2)
 
     def meta_loop(self):
         while not self.stop_event.is_set():
@@ -637,12 +771,15 @@ class GrabberDaemon:
                     info = ydl.extract_info(job.url, download=False)
 
                 size_bytes = estimate_bytes_from_info(info)
+                title = info.get("title", "") if isinstance(info, dict) else ""
 
                 with self.lock:
                     j = self.jobs.get(job_id)
                     if j:
                         if j.total <= 0 and size_bytes > 0:
                             j.total = int(size_bytes)
+                        if title and not j.title:
+                            j.title = str(title)
                         j.meta_done = True
 
             except Exception:
@@ -665,6 +802,9 @@ class GrabberDaemon:
                 if not job:
                     self.q.task_done()
                     continue
+                if self._shutting_down:
+                    self.q.task_done()
+                    continue
                 if job.started_at == 0.0:
                     job.started_at = time.time()
                 job.status = "downloading"
@@ -676,9 +816,9 @@ class GrabberDaemon:
 
                 if not job.final_path:
                     matches = sorted(
-                        self.out_dir.glob(job.job_id + ".*"),
+                        self.out_dir.glob(job.job_id + "*"),
                         key=lambda p: p.stat().st_mtime,
-                        reverse=True
+                        reverse=True,
                     )
                     if matches:
                         job.final_path = str(matches[0].resolve())
@@ -693,9 +833,22 @@ class GrabberDaemon:
 
             except Exception as e:
                 with self.lock:
-                    job.status = "fail"
-                    job.finished_at = time.time()
-                    job.error = str(e)
+                    if job.retry_count < self.max_retries:
+                        delay = self.retry_base_delay * (2 ** job.retry_count)
+                        job.retry_count += 1
+                        job.status = "pending"
+                        job.retry_after = time.time() + delay
+                        job.started_at = 0.0
+                        job.downloaded = 0
+                        job.speed = 0.0
+                        job.eta = 0
+                        job.eta_bad = False
+                        job.last_eta_check_at = 0.0
+                        self.pending.append(job_id)
+                    else:
+                        job.status = "fail"
+                        job.finished_at = time.time()
+                        job.error = str(e)
 
             finally:
                 self.q.task_done()
@@ -703,12 +856,22 @@ class GrabberDaemon:
     def monitor_loop(self):
         first = True
         refresh = float(self.cfg.get("refresh_sec", 0.6))
+        last_save = 0.0
         while not self.stop_event.is_set():
             self._render(first=first)
             first = False
+            now = time.time()
+            if now - last_save >= 10.0:
+                self._save_state()
+                last_save = now
             time.sleep(refresh)
 
-    def start(self):
+    def _state_save_loop(self):
+        while not self.stop_event.is_set():
+            time.sleep(10)
+            self._save_state()
+
+    def start(self, web_mode: bool = False):
         for _ in range(int(self.cfg["max_workers"])):
             threading.Thread(target=self.worker_loop, daemon=True).start()
 
@@ -717,7 +880,10 @@ class GrabberDaemon:
                 threading.Thread(target=self.meta_loop, daemon=True).start()
 
         threading.Thread(target=self.feeder_loop, daemon=True).start()
-        threading.Thread(target=self.monitor_loop, daemon=True).start()
+        if web_mode:
+            threading.Thread(target=self._state_save_loop, daemon=True).start()
+        else:
+            threading.Thread(target=self.monitor_loop, daemon=True).start()
 
 
 def main():
@@ -726,12 +892,15 @@ def main():
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    daemon = GrabberDaemon(cfg)
+    config_dir = Path(args.config).resolve().parent
+    state_path = (config_dir / cfg.get("state_file", "grabber_state.json")).resolve()
+
+    daemon = GrabberDaemon(cfg, state_path)
+    daemon._load_state()
     daemon.start()
 
     if cfg.get("csv_autoload", True):
-        script_dir = Path(__file__).resolve().parent
-        csv_path = find_csv(script_dir, cfg)
+        csv_path = find_csv(config_dir, cfg)
         if csv_path:
             urls = load_urls_from_csv(csv_path)
             count = daemon.add_many_urls(urls)
@@ -743,14 +912,35 @@ def main():
             line = input().strip()
             if not line:
                 continue
+
+            if line.startswith("!"):
+                rest = line[1:].strip()
+                try:
+                    daemon.bump_priority(int(rest))
+                except ValueError:
+                    pass
+                continue
+
             candidate = line.split()[0].strip()
             try:
                 daemon.add_url(candidate)
             except Exception:
                 pass
+
     except KeyboardInterrupt:
+        with daemon.lock:
+            daemon._shutting_down = True
+
+        while True:
+            with daemon.lock:
+                active = sum(1 for j in daemon.jobs.values() if j.status == "downloading")
+            if active == 0:
+                break
+            time.sleep(0.5)
+
+        daemon._save_state()
         daemon.stop_event.set()
-        print("\nExiting...")
+        print("\nExiting.")
 
 
 if __name__ == "__main__":
