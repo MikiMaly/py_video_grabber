@@ -408,7 +408,9 @@ class GrabberDaemon:
                         j.started_at = time.time()
                     j.status = "downloading"
                     j.downloaded = int(d.get("downloaded_bytes") or 0)
-                    j.total = int(d.get("total_bytes") or d.get("total_bytes_estimate") or j.total or 0)
+                    new_total = int(d.get("total_bytes") or d.get("total_bytes_estimate") or 0)
+                    if new_total > j.total:
+                        j.total = new_total
                     j.speed = float(d.get("speed") or 0.0)
                     j.eta = int(d.get("eta") or 0)
                     now2 = time.time()
