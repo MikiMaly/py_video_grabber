@@ -2,9 +2,7 @@
 
 ## UI
 
-- **Barvy fronty** — položky ve frontě jsou šedé a counter „queue" v headeru je žlutý; sjednotit oboje na žlutou
-- **Elapsed pod progress barem** — vedle ETA zobrazit i ELAP (jak dlouho se video už stahuje)
-- **slozka/lokace** - slozka se vybira slozkou ne textove
+- **Rebrand** — přejmenovat "Video Grabber" na "Ultimate Video Downloader" (název v headeru, title stránky, print v terminálu)
 
 ## Nastavení v GUI
 
@@ -13,3 +11,12 @@
 ## Logika stahování
 
 - **Lepší adaptivní logika** — např. automatické přizpůsobení počtu workerů nebo fragmentů podle aktuální rychlosti připojení; pokud je rychlost nízká, snížit paralelismus; pokud vysoká, zvýšit
+
+---
+
+## Hotovo v v6.7
+
+- **Barvy fronty** — badge "Ve frontě" změněn na žlutou (sjednoceno s headerem)
+- **Elapsed/ETA** — přeuspořádáno: rychlost | čas stahování (elapsed, žlutě) | čas do stažení (ETA, modře)
+- **Složka picker** — nativní Windows dialog přes tlačítko 📁
+- **Fix velikosti** — celková velikost se nepřepíše per-stream hodnotou u DASH formátů
