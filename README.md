@@ -1,4 +1,4 @@
-# py_video_grabber v6.6
+# py_video_grabber v6.8
 
 Webový grabber videí postavený na yt-dlp s jednoduchým prohlížečovým UI.
 
@@ -35,3 +35,22 @@ python webapp.py --port 9000 --config config.yaml
 ## Konfigurace
 
 Viz [config.yaml](config.yaml) — download složka, počet workerů, formát, timeouty.
+
+## Changelog
+
+### v6.8
+- Rebrand na "Ultimate Video Downloader"
+- Nový tab Nastavení se všemi config.yaml hodnotami (workers, fragments, retries, timeouty, ffmpeg, user-agent)
+- Header: workers +/- tlačítka nahrazena statickým displayem workers | frags
+
+### v6.7
+- Badge "Ve frontě" změněn na žlutou (sjednoceno s headerem)
+- Elapsed/ETA přeuspořádáno: rychlost | elapsed (žlutě) | ETA (modře)
+- Nativní Windows dialog pro výběr složky (tlačítko 📁)
+- Fix: celková velikost se nepřepíše per-stream hodnotou u DASH formátů
+
+### v6.6
+- Web UI rewrite, priority fix, URL normalizace
+
+### v6.5
+- Meaningful filenames, auto-retry s backoffem, persistentní stav, graceful shutdown, prioritní fronta

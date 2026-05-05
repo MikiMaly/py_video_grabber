@@ -8,6 +8,6 @@ fragment_retries: 30
 concurrent_fragments: 6
 
 user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36"
-ffmpeg_path: ""
+ffmpeg_path: "/opt/homebrew/bin/ffmpeg"
 queue_limit: 30
 ui_width: 110

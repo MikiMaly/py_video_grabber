@@ -42,7 +42,7 @@ HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Video Grabber</title>
+<title>Ultimate Video Downloader</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif;
@@ -61,13 +61,22 @@ HTML = r"""<!DOCTYPE html>
   .s-fail   .stat-val { color: #f85149; }
   #shutdown-banner { display: none; color: #f85149; font-size: 12px; font-weight: 600; }
 
-  /* workers control */
-  .workers-ctrl { display: flex; align-items: center; gap: 5px; border-left: 1px solid #30363d; padding-left: 16px; }
-  .btn-adj { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;
-             width: 22px; height: 22px; cursor: pointer; font-size: 15px; line-height: 1;
-             display: flex; align-items: center; justify-content: center; padding: 0; }
-  .btn-adj:hover { background: #388bfd; border-color: #388bfd; }
-  #workers-val { font-size: 17px; font-weight: 700; color: #c9d1d9; min-width: 18px; text-align: center; }
+  /* workers display */
+  .workers-disp { display: flex; align-items: center; gap: 5px; border-left: 1px solid #30363d; padding-left: 16px; }
+  .workers-disp .sep { color: #484f58; padding: 0 3px; }
+  #workers-val, #frags-val { font-size: 17px; font-weight: 700; color: #c9d1d9; min-width: 18px; text-align: center; }
+
+  /* ── tabs nav ── */
+  .tabs-nav { flex-shrink: 0; background: #161b22; border-bottom: 2px solid #30363d; display: flex; }
+  .tab-btn { background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px;
+             padding: 8px 20px; color: #8b949e; cursor: pointer; font-size: 13px; font-weight: 500;
+             transition: color .15s, border-color .15s; }
+  .tab-btn:hover { color: #c9d1d9; }
+  .tab-btn.active { color: #f0f6fc; border-bottom-color: #58a6ff; }
+
+  /* ── tab containers ── */
+  #tab-download { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  #tab-settings { flex: 1; overflow-y: auto; }
 
   /* ── staging ── */
   .staging { flex-shrink: 0; background: #161b22; border-bottom: 2px solid #30363d; }
@@ -147,6 +156,31 @@ HTML = r"""<!DOCTYPE html>
   .err-txt   { font-size: 11px; color: #f85149; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .act-btns  { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
   .empty-row td { padding: 40px; text-align: center; color: #484f58; }
+
+  /* ── settings ── */
+  .settings-scroll { max-width: 620px; padding: 20px; }
+  .settings-section { background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+                       padding: 16px; margin-bottom: 16px; }
+  .settings-section-title { font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase;
+                              letter-spacing: 0.5px; margin-bottom: 12px; }
+  .settings-row { display: flex; align-items: center; gap: 12px; padding: 7px 0;
+                  border-bottom: 1px solid #21262d; }
+  .settings-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .settings-row label { font-size: 13px; color: #c9d1d9; min-width: 175px; flex-shrink: 0; }
+  .settings-hint { font-size: 11px; color: #484f58; }
+  .settings-input { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+                    padding: 6px 10px; color: #c9d1d9; font-size: 13px; outline: none; }
+  .settings-input:focus { border-color: #58a6ff; }
+  .settings-input-num { width: 90px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+                         padding: 6px 10px; color: #c9d1d9; font-size: 13px; outline: none; text-align: right; }
+  .settings-input-num:focus { border-color: #58a6ff; }
+  .settings-select { background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+                     padding: 6px 8px; color: #c9d1d9; font-size: 13px; outline: none; cursor: pointer; }
+  .settings-select:focus { border-color: #58a6ff; }
+  .settings-actions { display: flex; align-items: center; gap: 16px; }
+  #settings-toast { font-size: 13px; }
+
+  /* ── statusline ── */
   .statusline { flex-shrink: 0; padding: 3px 20px; font-size: 11px; color: #484f58;
                 background: #161b22; border-top: 1px solid #30363d; }
 </style>
@@ -154,62 +188,152 @@ HTML = r"""<!DOCTYPE html>
 <body>
 
 <header>
-  <h1>&#9660; Video Grabber</h1>
+  <h1>&#9660; Ultimate Video Downloader</h1>
   <span id="shutdown-banner">&#9888; Shutting down&hellip;</span>
   <div class="stat s-active"><span class="stat-val" id="s-active">0</span><span class="stat-lbl">active</span></div>
   <div class="stat s-queue" ><span class="stat-val" id="s-queue" >0</span><span class="stat-lbl">queue</span></div>
   <div class="stat s-done"  ><span class="stat-val" id="s-done"  >0</span><span class="stat-lbl">done</span></div>
   <div class="stat s-fail"  ><span class="stat-val" id="s-fail"  >0</span><span class="stat-lbl">fail</span></div>
-  <div class="workers-ctrl">
-    <button class="btn-adj" onclick="adjustWorkers(-1)">&#8722;</button>
-    <span id="workers-val">2</span>
-    <button class="btn-adj" onclick="adjustWorkers(+1)">&#43;</button>
-    <span class="stat-lbl">workers</span>
+  <div class="workers-disp">
+    <span id="workers-val">?</span><span class="stat-lbl">workers</span>
+    <span class="sep">|</span>
+    <span id="frags-val">?</span><span class="stat-lbl">frags</span>
   </div>
 </header>
 
-<div class="staging">
-  <div class="stage-input-row">
-    <input type="text" id="url-input"
-           placeholder="URL nebo domena.com/video — Enter nebo klikni P&#345;idat&hellip;"
-           autocomplete="off" spellcheck="false">
-    <button class="btn" onclick="addToStaging()">+ P&#345;idat</button>
-    <span id="toast"></span>
-  </div>
-  <div class="stage-list" id="stage-list">
-    <div class="staged-empty">Fronta je pr&#225;zdn&#225; &ndash; vlo&#382; URL v&#253;&#353;e</div>
-  </div>
-  <div class="stage-footer">
-    <button class="btn" id="btn-dl-all" onclick="downloadAll()" disabled>&#9654; Sta&#382;en&#237; (0)</button>
-    <button class="btn btn-danger" id="btn-clear" onclick="clearStaging()" style="display:none">&#10005; Zru&#353;it v&#353;e</button>
-    <div class="folder-row">
-      <select class="fmt-select" id="fmt-select" onchange="changeFormat(this.value)" title="Form&#225;t">
-        <option value="bv*+ba/b">Nejlep&#353;&#237; kvalita</option>
-        <option value="bv[height<=1080]+ba/b">Max 1080p</option>
-        <option value="bv[height<=720]+ba/b">Max 720p</option>
-        <option value="bv[height<=480]+ba/b">Max 480p</option>
-        <option value="worst/w">Nejmen&#353;&#237; soubor</option>
-      </select>
-      <span style="color:#8b949e;font-size:12px">Slo&#382;ka:</span>
-      <input type="text" id="out-dir-input" class="folder-input" placeholder="&hellip;">
-      <button class="btn-sm" onclick="browseFolder()" title="Vybrat slo&#382;ku">&#128193;</button>
-      <button class="btn-sm" onclick="changeOutDir()">Zm&#283;nit</button>
+<nav class="tabs-nav">
+  <button class="tab-btn active" data-tab="download" onclick="switchTab('download')">&#9654; Stahov&#225;n&#237;</button>
+  <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">&#9881; Nastaven&#237;</button>
+</nav>
+
+<!-- Tab: Stahování -->
+<div id="tab-download">
+  <div class="staging">
+    <div class="stage-input-row">
+      <input type="text" id="url-input"
+             placeholder="URL nebo domena.com/video &mdash; Enter nebo klikni P&#345;idat&hellip;"
+             autocomplete="off" spellcheck="false">
+      <button class="btn" onclick="addToStaging()">+ P&#345;idat</button>
+      <span id="toast"></span>
     </div>
+    <div class="stage-list" id="stage-list">
+      <div class="staged-empty">Fronta je pr&#225;zdn&#225; &ndash; vlo&#382; URL v&#253;&#353;e</div>
+    </div>
+    <div class="stage-footer">
+      <button class="btn" id="btn-dl-all" onclick="downloadAll()" disabled>&#9654; Sta&#382;en&#237; (0)</button>
+      <button class="btn btn-danger" id="btn-clear" onclick="clearStaging()" style="display:none">&#10005; Zru&#353;it v&#353;e</button>
+      <div class="folder-row">
+        <select class="fmt-select" id="fmt-select" onchange="changeFormat(this.value)" title="Form&#225;t">
+          <option value="bv*+ba/b">Nejlep&#353;&#237; kvalita</option>
+          <option value="bv[height<=1080]+ba/b">Max 1080p</option>
+          <option value="bv[height<=720]+ba/b">Max 720p</option>
+          <option value="bv[height<=480]+ba/b">Max 480p</option>
+          <option value="worst/w">Nejmen&#353;&#237; soubor</option>
+        </select>
+        <span style="color:#8b949e;font-size:12px">Slo&#382;ka:</span>
+        <input type="text" id="out-dir-input" class="folder-input" placeholder="&hellip;">
+        <button class="btn-sm" onclick="browseFolder()" title="Vybrat slo&#382;ku">&#128193;</button>
+        <button class="btn-sm" onclick="changeOutDir()">Zm&#283;nit</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <colgroup>
+        <col class="col-id"><col class="col-st"><col class="col-ttl"><col class="col-prg"><col class="col-act">
+      </colgroup>
+      <thead>
+        <tr><th>#</th><th>Status</th><th>N&#225;zev / URL</th><th>Pr&#367;b&#283;h</th><th></th></tr>
+      </thead>
+      <tbody id="jobs-body">
+        <tr class="empty-row"><td colspan="5">&#381;&#225;dn&#233; joby&hellip;</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
-<div class="table-wrap">
-  <table>
-    <colgroup>
-      <col class="col-id"><col class="col-st"><col class="col-ttl"><col class="col-prg"><col class="col-act">
-    </colgroup>
-    <thead>
-      <tr><th>#</th><th>Status</th><th>N&#225;zev / URL</th><th>Pr&#367;b&#283;h</th><th></th></tr>
-    </thead>
-    <tbody id="jobs-body">
-      <tr class="empty-row"><td colspan="5">&#381;&#225;dn&#233; joby&hellip;</td></tr>
-    </tbody>
-  </table>
+<!-- Tab: Nastavení -->
+<div id="tab-settings" style="display:none">
+  <div class="settings-scroll">
+
+    <div class="settings-section">
+      <div class="settings-section-title">Stahov&#225;n&#237;</div>
+      <div class="settings-row">
+        <label>Slo&#382;ka</label>
+        <input type="text" id="cfg-download-dir" class="settings-input" placeholder="./downloads">
+        <button class="btn-sm" onclick="cfgBrowseFolder()">&#128193;</button>
+      </div>
+      <div class="settings-row">
+        <label>Workers</label>
+        <input type="number" id="cfg-workers" class="settings-input-num" min="1" max="16">
+        <span class="settings-hint">1&ndash;16 paraleln&#237;ch stahov&#225;n&#237;</span>
+      </div>
+      <div class="settings-row">
+        <label>Concurrent fragments</label>
+        <input type="number" id="cfg-concurrent-fragments" class="settings-input-num" min="1" max="32">
+        <span class="settings-hint">fragmenty jednoho videa paraleln&#283;</span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Form&#225;t &amp; Kvalita</div>
+      <div class="settings-row">
+        <label>Form&#225;t</label>
+        <select id="cfg-format" class="settings-select">
+          <option value="bv*+ba/b">Nejlep&#353;&#237; kvalita</option>
+          <option value="bv[height<=1080]+ba/b">Max 1080p</option>
+          <option value="bv[height<=720]+ba/b">Max 720p</option>
+          <option value="bv[height<=480]+ba/b">Max 480p</option>
+          <option value="worst/w">Nejmen&#353;&#237; soubor</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Retry &amp; Timeouty</div>
+      <div class="settings-row">
+        <label>Timeout (s)</label>
+        <input type="number" id="cfg-timeout" class="settings-input-num" min="5">
+      </div>
+      <div class="settings-row">
+        <label>Retries yt-dlp</label>
+        <input type="number" id="cfg-retries" class="settings-input-num" min="0">
+      </div>
+      <div class="settings-row">
+        <label>Fragment retries</label>
+        <input type="number" id="cfg-fragment-retries" class="settings-input-num" min="0">
+      </div>
+      <div class="settings-row">
+        <label>Max retries (app)</label>
+        <input type="number" id="cfg-max-retries" class="settings-input-num" min="0">
+        <span class="settings-hint">po kter&#253;ch job selže natr&#253;no</span>
+      </div>
+      <div class="settings-row">
+        <label>Retry base delay (s)</label>
+        <input type="number" id="cfg-retry-delay" class="settings-input-num" min="1">
+        <span class="settings-hint">exponenci&#225;ln&#237; backoff</span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Syst&#233;m</div>
+      <div class="settings-row">
+        <label>User-Agent</label>
+        <input type="text" id="cfg-user-agent" class="settings-input">
+      </div>
+      <div class="settings-row">
+        <label>FFmpeg cesta</label>
+        <input type="text" id="cfg-ffmpeg-path" class="settings-input" placeholder="/opt/homebrew/bin/ffmpeg">
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn" onclick="saveSettings()">Ulo&#382;it nastaven&#237;</button>
+      <span id="settings-toast"></span>
+    </div>
+
+  </div>
 </div>
 
 <div class="statusline" id="statusline">P&#345;ipojuji&hellip;</div>
@@ -219,11 +343,17 @@ HTML = r"""<!DOCTYPE html>
 function normalizeUrl(raw) {
   raw = raw.trim();
   if (!raw) return null;
-  // Already has scheme
   if (/^https?:\/\//i.test(raw)) return raw;
-  // Looks like a domain/path — prepend https://
   if (raw.includes('.') && !raw.startsWith(' ')) return 'https://' + raw;
   return null;
+}
+
+// ── tabs ──
+function switchTab(tab) {
+  document.getElementById('tab-download').style.display = tab === 'download' ? 'flex' : 'none';
+  document.getElementById('tab-settings').style.display = tab === 'settings' ? '' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'settings' && !settingsLoaded) loadSettings();
 }
 
 // ── staging ──
@@ -251,7 +381,6 @@ function pushStaged(url) {
 function addToStaging() {
   const raw = urlInput.value.trim();
   if (!raw) return;
-  // Split on whitespace/comma/semicolon and try each token
   const tokens = raw.split(/[\s,;]+/);
   let added = 0;
   tokens.forEach(t => { const u = normalizeUrl(t); if (u && pushStaged(u)) added++; });
@@ -338,17 +467,6 @@ async function changeFormat(fmt) {
   });
 }
 
-// ── workers ──
-async function adjustWorkers(delta) {
-  const cur = parseInt(document.getElementById('workers-val').textContent) || 1;
-  const n   = Math.max(1, Math.min(16, cur + delta));
-  const r   = await fetch('/api/set_workers', {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({n})
-  });
-  const d = await r.json();
-  if (d.ok) document.getElementById('workers-val').textContent = d.workers;
-}
-
 // ── job actions ──
 async function bumpPriority(jid) {
   await fetch('/api/priority', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({jid}) });
@@ -382,7 +500,7 @@ function fmtSize(b) {
 
 // ── render jobs ──
 function renderJob(j) {
-  const labels = {downloading:'Stahuje', queued:'Ve frontě', pending:'Čeká', done:'Hotovo', fail:'Chyba'};
+  const labels = {downloading:'Stahuje', queued:'Ve frontě', pending:'Čeká', done:'Hotovo', fail:'Chyba'};
   const titleHtml = j.title
     ? '<div class="t-title">'+esc(j.title)+'</div><div class="t-url">'+esc(j.url)+'</div>'
     : '<div class="t-url" style="color:#8b949e">'+esc(j.url)+'</div>';
@@ -395,17 +513,17 @@ function renderJob(j) {
       '<div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%"></div></div>' +
       '<div class="prog-row">' +
         '<span class="pct">'+pct.toFixed(1)+'%</span>' +
-        '<span>'+fmtSize(j.downloaded)+' / '+j.total_str+'</span>' +
+        '<span>'+fmtSize(j.downloaded)+' / '+j.total_str+'</span>' +
         '<span class="spd">'+j.speed_str+'</span>' +
         '<span class="elap">čas stahování '+j.elapsed_str+'</span>' +
         (j.eta_str ? '<span class="eta'+(j.eta_bad?' bad':'')+'">čas do stažení '+j.eta_str+'</span>' : '') +
       '</div>';
 
   } else if (j.status === 'queued') {
-    progHtml = '<span class="dim">Ve frontě od '+j.enqueued_at+'</span>';
+    progHtml = '<span class="dim">Ve frontě od '+j.enqueued_at+'</span>';
     actHtml  =
       '<div class="act-btns">' +
-        '<button class="btn-prio"   onclick="bumpPriority('+j.jid+')">↑ Prio</button>' +
+        '<button class="btn-prio"   onclick="bumpPriority('+j.jid+')">↑ Prio</button>' +
         '<button class="btn-cancel" onclick="cancelJob('+j.jid+')">✕</button>' +
       '</div>';
 
@@ -413,16 +531,16 @@ function renderJob(j) {
     const now = Date.now() / 1000;
     let badge = '';
     if (j.retry_count > 0 && j.retry_after > now) {
-      badge = '<span class="retry-tag">· retry '+j.retry_count+'/'+j.max_retries+' za '+Math.ceil(j.retry_after-now)+'s</span>';
+      badge = '<span class="retry-tag">· retry '+j.retry_count+'/'+j.max_retries+' za '+Math.ceil(j.retry_after-now)+'s</span>';
     } else if (j.retry_count > 0) {
-      badge = '<span class="retry-tag">· retry '+j.retry_count+'/'+j.max_retries+'</span>';
+      badge = '<span class="retry-tag">· retry '+j.retry_count+'/'+j.max_retries+'</span>';
     } else if (j.priority > 0) {
-      badge = '<span class="prio-tag">· prio+'+j.priority+'</span>';
+      badge = '<span class="prio-tag">· prio+'+j.priority+'</span>';
     }
-    progHtml = '<span class="dim">Přidáno '+j.added_at+'</span>'+badge;
+    progHtml = '<span class="dim">Přidáno '+j.added_at+'</span>'+badge;
     actHtml  =
       '<div class="act-btns">' +
-        '<button class="btn-prio"   onclick="bumpPriority('+j.jid+')">↑ Prio</button>' +
+        '<button class="btn-prio"   onclick="bumpPriority('+j.jid+')">↑ Prio</button>' +
         '<button class="btn-cancel" onclick="cancelJob('+j.jid+')">✕</button>' +
       '</div>';
 
@@ -430,11 +548,11 @@ function renderJob(j) {
     const fname = j.final_path ? j.final_path.replace(/\\/g,'/').split('/').pop() : '?';
     progHtml =
       '<div class="path-txt" title="'+esc(j.final_path)+'">'+esc(fname)+'</div>' +
-      '<div class="prog-row"><span>'+j.total_str+'</span><span class="dim">za '+j.elapsed_str+'</span></div>';
+      '<div class="prog-row"><span>'+j.total_str+'</span><span class="dim">za '+j.elapsed_str+'</span></div>';
 
   } else if (j.status === 'fail') {
     progHtml = '<div class="err-txt" title="'+esc(j.error)+'">'+esc(j.error||'neznámá chyba')+'</div>';
-    actHtml  = '<button class="btn-retry" onclick="retryJob('+j.jid+')">↺ Retry</button>';
+    actHtml  = '<button class="btn-retry" onclick="retryJob('+j.jid+')">↺ Retry</button>';
   }
 
   return '<tr>' +
@@ -458,11 +576,11 @@ async function refresh() {
     document.getElementById('s-done').textContent   = s.done;
     document.getElementById('s-fail').textContent   = s.fail;
     document.getElementById('workers-val').textContent = s.workers;
+    document.getElementById('frags-val').textContent   = s.concurrent_fragments;
     document.getElementById('shutdown-banner').style.display = s.shutting_down ? 'inline' : 'none';
 
     if (!folderReady) {
       document.getElementById('out-dir-input').value = s.out_dir;
-      // sync format selector
       const sel = document.getElementById('fmt-select');
       for (let i = 0; i < sel.options.length; i++) {
         if (sel.options[i].value === s.format) { sel.selectedIndex = i; break; }
@@ -472,12 +590,12 @@ async function refresh() {
 
     const tbody = document.getElementById('jobs-body');
     if (!d.jobs.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Frónta je prázdná</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Fronta je prázdná</td></tr>';
     } else {
       tbody.innerHTML = d.jobs.map(renderJob).join('');
     }
     document.getElementById('statusline').textContent =
-      'Workers: '+s.workers+' | Aktualizováno: '+new Date().toLocaleTimeString('cs-CZ');
+      'Workers: '+s.workers+' · Frags: '+s.concurrent_fragments+' | Aktualizováno: '+new Date().toLocaleTimeString('cs-CZ');
   } catch(e) {
     document.getElementById('statusline').textContent = 'Spojení ztraceno – opakuji…';
   }
@@ -485,6 +603,90 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 1000);
+
+// ── settings ──
+let settingsLoaded = false;
+
+async function loadSettings() {
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    document.getElementById('cfg-download-dir').value          = d.download_dir;
+    document.getElementById('cfg-workers').value               = d.max_workers;
+    document.getElementById('cfg-concurrent-fragments').value  = d.concurrent_fragments;
+    const sel = document.getElementById('cfg-format');
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === d.format) { sel.selectedIndex = i; break; }
+    }
+    document.getElementById('cfg-timeout').value               = d.timeout_sec;
+    document.getElementById('cfg-retries').value               = d.retries;
+    document.getElementById('cfg-fragment-retries').value      = d.fragment_retries;
+    document.getElementById('cfg-max-retries').value           = d.max_retries;
+    document.getElementById('cfg-retry-delay').value           = d.retry_base_delay;
+    document.getElementById('cfg-user-agent').value            = d.user_agent;
+    document.getElementById('cfg-ffmpeg-path').value           = d.ffmpeg_path;
+    settingsLoaded = true;
+  } catch(e) {
+    showSettingsToast('Chyba načítání nastavení', '#f85149');
+  }
+}
+
+async function saveSettings() {
+  const payload = {
+    download_dir:         document.getElementById('cfg-download-dir').value.trim(),
+    max_workers:          parseInt(document.getElementById('cfg-workers').value) || 1,
+    concurrent_fragments: parseInt(document.getElementById('cfg-concurrent-fragments').value) || 1,
+    format:               document.getElementById('cfg-format').value,
+    timeout_sec:          parseInt(document.getElementById('cfg-timeout').value) || 60,
+    retries:              parseInt(document.getElementById('cfg-retries').value) || 0,
+    fragment_retries:     parseInt(document.getElementById('cfg-fragment-retries').value) || 0,
+    max_retries:          parseInt(document.getElementById('cfg-max-retries').value) || 0,
+    retry_base_delay:     parseFloat(document.getElementById('cfg-retry-delay').value) || 10,
+    user_agent:           document.getElementById('cfg-user-agent').value.trim(),
+    ffmpeg_path:          document.getElementById('cfg-ffmpeg-path').value.trim(),
+  };
+  try {
+    const r = await fetch('/api/set_config', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showSettingsToast('Nastavení uloženo ✓', '#3fb950');
+      settingsLoaded = false;
+      // sync staging area
+      if (payload.download_dir) document.getElementById('out-dir-input').value = payload.download_dir;
+      const stageFmt = document.getElementById('fmt-select');
+      for (let i = 0; i < stageFmt.options.length; i++) {
+        if (stageFmt.options[i].value === payload.format) { stageFmt.selectedIndex = i; break; }
+      }
+    } else {
+      showSettingsToast(d.error || 'Chyba', '#f85149');
+    }
+  } catch(e) {
+    showSettingsToast('Chyba spojení', '#f85149');
+  }
+}
+
+async function cfgBrowseFolder() {
+  const r = await fetch('/api/browse_folder');
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById('cfg-download-dir').value = d.path;
+    document.getElementById('out-dir-input').value = d.path;
+    showSettingsToast('Složka vybrána ✓', '#3fb950');
+  } else if (!d.cancelled) {
+    showSettingsToast(d.error || 'Chyba', '#f85149');
+  }
+}
+
+let settingsToastTimer = null;
+function showSettingsToast(msg, color) {
+  const t = document.getElementById('settings-toast');
+  t.textContent = msg;
+  t.style.color = color || '#f85149';
+  if (settingsToastTimer) clearTimeout(settingsToastTimer);
+  settingsToastTimer = setTimeout(() => { t.textContent = ''; }, 3000);
+}
 </script>
 </body>
 </html>"""
@@ -561,15 +763,16 @@ async def get_state():
             del j["_sort"]
 
         stats = {
-            "active":        sum(1 for j in daemon.jobs.values() if j.status == "downloading"),
-            "queued":        sum(1 for j in daemon.jobs.values() if j.status == "queued"),
-            "pending":       sum(1 for j in daemon.jobs.values() if j.status == "pending"),
-            "done":          sum(1 for j in daemon.jobs.values() if j.status == "done"),
-            "fail":          sum(1 for j in daemon.jobs.values() if j.status == "fail"),
-            "workers":       _d()._max_workers,
-            "format":        _d().cfg.get("format", "bv*+ba/b"),
-            "out_dir":       str(daemon.out_dir),
-            "shutting_down": daemon._shutting_down,
+            "active":               sum(1 for j in daemon.jobs.values() if j.status == "downloading"),
+            "queued":               sum(1 for j in daemon.jobs.values() if j.status == "queued"),
+            "pending":              sum(1 for j in daemon.jobs.values() if j.status == "pending"),
+            "done":                 sum(1 for j in daemon.jobs.values() if j.status == "done"),
+            "fail":                 sum(1 for j in daemon.jobs.values() if j.status == "fail"),
+            "workers":              _d()._max_workers,
+            "concurrent_fragments": int(_d().cfg.get("concurrent_fragments", 3)),
+            "format":               _d().cfg.get("format", "bv*+ba/b"),
+            "out_dir":              str(daemon.out_dir),
+            "shutting_down":        daemon._shutting_down,
         }
 
     return {"stats": stats, "jobs": jobs_list}
@@ -581,14 +784,24 @@ class BulkReq(BaseModel):
 class PrioReq(BaseModel):
     jid: int
 
-class WorkersReq(BaseModel):
-    n: int
-
 class FormatReq(BaseModel):
     fmt: str
 
 class SetOutDirReq(BaseModel):
     path: str
+
+class SetConfigReq(BaseModel):
+    download_dir: str | None = None
+    max_workers: int | None = None
+    concurrent_fragments: int | None = None
+    format: str | None = None
+    timeout_sec: int | None = None
+    retries: int | None = None
+    fragment_retries: int | None = None
+    max_retries: int | None = None
+    retry_base_delay: float | None = None
+    user_agent: str | None = None
+    ffmpeg_path: str | None = None
 
 
 @app.post("/api/add_bulk")
@@ -611,12 +824,6 @@ async def retry_job(req: PrioReq):
     return {"ok": True, "message": daemon.retry_job(req.jid)}
 
 
-@app.post("/api/set_workers")
-async def set_workers(req: WorkersReq):
-    n = _d().set_workers(req.n)
-    return {"ok": True, "workers": n}
-
-
 @app.post("/api/set_format")
 async def set_format(req: FormatReq):
     _d().set_format(req.fmt)
@@ -634,13 +841,25 @@ async def set_outdir(req: SetOutDirReq):
 
 @app.get("/api/browse_folder")
 async def browse_folder():
-    def _pick():
-        root = tk.Tk()
-        root.withdraw()
-        root.wm_attributes("-topmost", True)
-        path = filedialog.askdirectory(parent=root, title="Vyber složku pro stahování")
-        root.destroy()
-        return path
+    def _pick() -> str | None:
+        if sys.platform == "darwin":
+            import subprocess
+            r = subprocess.run(
+                ["osascript", "-e",
+                 'POSIX path of (choose folder with prompt "Vyber složku pro stahování")'],
+                capture_output=True, text=True,
+            )
+            if r.returncode == 0:
+                return r.stdout.strip().rstrip("/")
+            return None
+        else:
+            root = tk.Tk()
+            root.withdraw()
+            root.wm_attributes("-topmost", True)
+            path = filedialog.askdirectory(parent=root, title="Vyber složku pro stahování")
+            root.destroy()
+            return path or None
+
     loop = asyncio.get_event_loop()
     path = await loop.run_in_executor(None, _pick)
     if not path:
@@ -648,6 +867,60 @@ async def browse_folder():
     try:
         resolved = daemon.set_out_dir(path)
         return {"ok": True, "path": resolved}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/config")
+async def get_config():
+    d = _d()
+    cfg = d.cfg
+    frag_ret = cfg.get("fragment_retries")
+    return {
+        "download_dir":         str(d.out_dir),
+        "max_workers":          d._max_workers,
+        "concurrent_fragments": int(cfg.get("concurrent_fragments", 3)),
+        "format":               cfg.get("format", "bv*+ba/b"),
+        "timeout_sec":          int(cfg.get("timeout_sec", 60)),
+        "retries":              int(cfg.get("retries", 20)),
+        "fragment_retries":     int(frag_ret) if frag_ret is not None else int(cfg.get("retries", 20)),
+        "max_retries":          d.max_retries,
+        "retry_base_delay":     d.retry_base_delay,
+        "user_agent":           cfg.get("user_agent", ""),
+        "ffmpeg_path":          cfg.get("ffmpeg_path", ""),
+    }
+
+
+@app.post("/api/set_config")
+async def set_config(req: SetConfigReq):
+    d = _d()
+    try:
+        if req.download_dir:
+            d.set_out_dir(req.download_dir)
+        if req.max_workers is not None:
+            d.set_workers(req.max_workers)
+        if req.format is not None:
+            d.set_format(req.format)
+        with d.lock:
+            if req.concurrent_fragments is not None:
+                d.cfg["concurrent_fragments"] = max(1, req.concurrent_fragments)
+            if req.timeout_sec is not None:
+                d.cfg["timeout_sec"] = max(5, req.timeout_sec)
+            if req.retries is not None:
+                d.cfg["retries"] = max(0, req.retries)
+            if req.fragment_retries is not None:
+                d.cfg["fragment_retries"] = max(0, req.fragment_retries)
+            if req.max_retries is not None:
+                d.max_retries = max(0, req.max_retries)
+                d.cfg["max_retries"] = d.max_retries
+            if req.retry_base_delay is not None:
+                d.retry_base_delay = max(1.0, req.retry_base_delay)
+                d.cfg["retry_base_delay"] = d.retry_base_delay
+            if req.user_agent is not None:
+                d.cfg["user_agent"] = req.user_agent
+            if req.ffmpeg_path is not None:
+                d.cfg["ffmpeg_path"] = req.ffmpeg_path
+        return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -679,7 +952,7 @@ def main():
     if not args.no_browser:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{args.port}")).start()
 
-    print(f"Video Grabber -> http://localhost:{args.port}")
+    print(f"Ultimate Video Downloader -> http://localhost:{args.port}")
     uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
 
 
