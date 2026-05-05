@@ -1,0 +1,20 @@
+# runtime state — private download history
+grabber_state.json
+grabber_state.tmp
+
+# downloads folder
+downloads/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# claude internal
+.claude/
