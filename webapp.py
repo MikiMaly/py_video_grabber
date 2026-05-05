@@ -7,6 +7,8 @@ import threading
 import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
+import tkinter as tk
+from tkinter import filedialog
 
 if getattr(sys, "frozen", False):
     _base = Path(sys._MEIPASS)          # type: ignore[attr-defined]
@@ -124,7 +126,7 @@ HTML = r"""<!DOCTYPE html>
   td { padding: 6px 10px; vertical-align: middle; overflow: hidden; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
   .b-downloading { background: #1f3a5f; color: #58a6ff; }
-  .b-queued      { background: #2d333b; color: #8b949e; }
+  .b-queued      { background: #2d2208; color: #d29922; }
   .b-pending     { background: #2d2208; color: #d29922; }
   .b-done        { background: #1a3d2b; color: #3fb950; }
   .b-fail        { background: #3d1a1a; color: #f85149; }
@@ -137,6 +139,7 @@ HTML = r"""<!DOCTYPE html>
   .spd { color: #3fb950; }
   .eta { color: #58a6ff; }
   .eta.bad { color: #f85149; }
+  .elap { color: #d29922; }
   .dim { color: #484f58; }
   .retry-tag { color: #d29922; font-size: 11px; }
   .prio-tag  { color: #58a6ff; font-size: 11px; }
@@ -189,6 +192,7 @@ HTML = r"""<!DOCTYPE html>
       </select>
       <span style="color:#8b949e;font-size:12px">Slo&#382;ka:</span>
       <input type="text" id="out-dir-input" class="folder-input" placeholder="&hellip;">
+      <button class="btn-sm" onclick="browseFolder()" title="Vybrat slo&#382;ku">&#128193;</button>
       <button class="btn-sm" onclick="changeOutDir()">Zm&#283;nit</button>
     </div>
   </div>
@@ -302,6 +306,17 @@ async function downloadAll() {
 // ── folder & format ──
 let folderReady = false;
 
+async function browseFolder() {
+  const r = await fetch('/api/browse_folder');
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById('out-dir-input').value = d.path;
+    showToast('Složka změněna ✓', '#3fb950');
+  } else if (!d.cancelled) {
+    showToast(d.error || 'Chyba');
+  }
+}
+
 async function changeOutDir() {
   const inp  = document.getElementById('out-dir-input');
   const path = inp.value.trim();
@@ -382,8 +397,8 @@ function renderJob(j) {
         '<span class="pct">'+pct.toFixed(1)+'%</span>' +
         '<span>'+fmtSize(j.downloaded)+' / '+j.total_str+'</span>' +
         '<span class="spd">'+j.speed_str+'</span>' +
-        (j.eta_str ? '<span class="eta'+(j.eta_bad?' bad':'')+'">ETA '+j.eta_str+'</span>' : '') +
-        '<span class="dim">'+j.elapsed_str+'</span>' +
+        '<span class="elap">čas stahování '+j.elapsed_str+'</span>' +
+        (j.eta_str ? '<span class="eta'+(j.eta_bad?' bad':'')+'">čas do stažení '+j.eta_str+'</span>' : '') +
       '</div>';
 
   } else if (j.status === 'queued') {
@@ -612,6 +627,26 @@ async def set_format(req: FormatReq):
 async def set_outdir(req: SetOutDirReq):
     try:
         resolved = daemon.set_out_dir(req.path)
+        return {"ok": True, "path": resolved}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/browse_folder")
+async def browse_folder():
+    def _pick():
+        root = tk.Tk()
+        root.withdraw()
+        root.wm_attributes("-topmost", True)
+        path = filedialog.askdirectory(parent=root, title="Vyber složku pro stahování")
+        root.destroy()
+        return path
+    loop = asyncio.get_event_loop()
+    path = await loop.run_in_executor(None, _pick)
+    if not path:
+        return {"ok": False, "cancelled": True}
+    try:
+        resolved = daemon.set_out_dir(path)
         return {"ok": True, "path": resolved}
     except Exception as e:
         return {"ok": False, "error": str(e)}
