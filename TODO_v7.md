@@ -4,6 +4,7 @@
 
 - **Barvy fronty** — položky ve frontě jsou šedé a counter „queue" v headeru je žlutý; sjednotit oboje na žlutou
 - **Elapsed pod progress barem** — vedle ETA zobrazit i ELAP (jak dlouho se video už stahuje)
+- **slozka/lokace** - slozka se vybira slozkou ne textove
 
 ## Nastavení v GUI
 
