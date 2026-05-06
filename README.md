@@ -38,4 +38,4 @@ Viz [config.yaml](config.yaml) — download složka, počet workerů, formát, t
 
 ## Changelog
 
-Viz [CHANGELOG.md](CHANGELOG.md).
+Viz [CHANGELOG.md](CHANGELOG.md) — aktuálně v6.9: adaptivní fragmenty, per-job audio mode, FFmpeg fallback, MP3 badges.

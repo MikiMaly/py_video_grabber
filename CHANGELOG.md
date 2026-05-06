@@ -1,7 +1,11 @@
 # Changelog
 
 ## v6.9
-- Adaptivní fragmenty — hill-climbing algoritmus každých 12s měří celkovou rychlost a +1/−1 upravuje `concurrent_fragments`; při poklesu rychlosti >10 % otočí směr; toggle + rozsah (min/max) v nastavení; badge "auto" v hlavičce
+- Adaptivní fragmenty — hill-climbing algoritmus každých 12s měří celkovou rychlost a ±1 upravuje `concurrent_fragments`; při poklesu rychlosti >10 % otočí směr; toggle + rozsah (min/max) v nastavení; badge "auto" v hlavičce
+- Per-job audio mode — checkbox "Jen audio" v headeru; každý job má vlastní příznak; stahuje audio odděleně
+- FFmpeg fallback — auto-detekce FFmpeg; pokud je dostupný: MP3 192 kbps; jinak M4A nativně
+- Queue badges — zelený "MP3" badge u audio jobů v tabulce fronty
+- Header UX — audio checkbox přesunut do headeru vlevo od čítačů; "auto" badge u workers/frags
 
 ## v6.8
 - Rebrand na "Ultimate Video Downloader" (header, title, terminál)
