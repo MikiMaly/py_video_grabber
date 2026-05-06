@@ -1,4 +1,4 @@
-# py_video_grabber v6.8
+# py_video_grabber v6.9
 
 Webový grabber videí postavený na yt-dlp s jednoduchým prohlížečovým UI.
 
@@ -37,6 +37,9 @@ python webapp.py --port 9000 --config config.yaml
 Viz [config.yaml](config.yaml) — download složka, počet workerů, formát, timeouty.
 
 ## Changelog
+
+### v6.9
+- Adaptivní fragmenty — hill-climbing algoritmus každých 12s měří celkovou rychlost stahování a automaticky přizpůsobuje `concurrent_fragments`; badge "auto" v hlavičce; toggle + rozsah v nastavení
 
 ### v6.8
 - Rebrand na "Ultimate Video Downloader"

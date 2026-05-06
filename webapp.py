@@ -180,6 +180,21 @@ HTML = r"""<!DOCTYPE html>
   .settings-actions { display: flex; align-items: center; gap: 16px; }
   #settings-toast { font-size: 13px; }
 
+  /* ── version badge ── */
+  .version-badge { font-size: 11px; color: #484f58; font-weight: 400; margin-left: 10px; }
+
+  /* ── audio checkbox ── */
+  .audio-chk-label { display: flex; align-items: center; gap: 5px; font-size: 12px;
+                     color: #8b949e; cursor: pointer; white-space: nowrap; user-select: none;
+                     border-right: 1px solid #30363d; padding-right: 16px; }
+  .audio-chk-label input { accent-color: #3fb950; cursor: pointer; width: 14px; height: 14px; }
+  .audio-chk-label.active { color: #3fb950; }
+
+  /* ── audio badge in queue ── */
+  .audio-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px;
+                 font-weight: 700; background: #1a3d2b; color: #3fb950; margin-left: 6px;
+                 vertical-align: middle; letter-spacing: 0.3px; }
+
   /* ── statusline ── */
   .statusline { flex-shrink: 0; padding: 3px 20px; font-size: 11px; color: #484f58;
                 background: #161b22; border-top: 1px solid #30363d; }
@@ -188,8 +203,11 @@ HTML = r"""<!DOCTYPE html>
 <body>
 
 <header>
-  <h1>&#9660; Ultimate Video Downloader</h1>
+  <h1>&#9660; Ultimate Video Downloader <span class="version-badge">v6.9 &middot; autospeed + audio update</span></h1>
   <span id="shutdown-banner">&#9888; Shutting down&hellip;</span>
+  <label class="audio-chk-label" id="audio-chk-label" title="Sta&#382;en&#237; jen zvuku (MP3 / M4A)">
+    <input type="checkbox" id="audio-only-chk" onchange="toggleAudioOnly()"> Jen audio
+  </label>
   <div class="stat s-active"><span class="stat-val" id="s-active">0</span><span class="stat-lbl">active</span></div>
   <div class="stat s-queue" ><span class="stat-val" id="s-queue" >0</span><span class="stat-lbl">queue</span></div>
   <div class="stat s-done"  ><span class="stat-val" id="s-done"  >0</span><span class="stat-lbl">done</span></div>
@@ -197,7 +215,7 @@ HTML = r"""<!DOCTYPE html>
   <div class="workers-disp">
     <span id="workers-val">?</span><span class="stat-lbl">workers</span>
     <span class="sep">|</span>
-    <span id="frags-val">?</span><span class="stat-lbl">frags</span>
+    <span id="frags-val">?</span><span id="adapt-badge" style="display:none;font-size:10px;color:#3fb950;padding-left:3px">auto</span><span class="stat-lbl">frags</span>
   </div>
 </header>
 
@@ -229,6 +247,7 @@ HTML = r"""<!DOCTYPE html>
           <option value="bv[height<=720]+ba/b">Max 720p</option>
           <option value="bv[height<=480]+ba/b">Max 480p</option>
           <option value="worst/w">Nejmen&#353;&#237; soubor</option>
+          <option value="ba/b">Jen audio (MP3)</option>
         </select>
         <span style="color:#8b949e;font-size:12px">Slo&#382;ka:</span>
         <input type="text" id="out-dir-input" class="folder-input" placeholder="&hellip;">
@@ -257,6 +276,11 @@ HTML = r"""<!DOCTYPE html>
 <div id="tab-settings" style="display:none">
   <div class="settings-scroll">
 
+    <div class="settings-actions" style="margin-bottom:16px">
+      <button class="btn" onclick="saveSettings()">Ulo&#382;it nastaven&#237;</button>
+      <span id="settings-toast"></span>
+    </div>
+
     <div class="settings-section">
       <div class="settings-section-title">Stahov&#225;n&#237;</div>
       <div class="settings-row">
@@ -274,6 +298,18 @@ HTML = r"""<!DOCTYPE html>
         <input type="number" id="cfg-concurrent-fragments" class="settings-input-num" min="1" max="32">
         <span class="settings-hint">fragmenty jednoho videa paraleln&#283;</span>
       </div>
+      <div class="settings-row">
+        <label>Auto-adapt fragmenty</label>
+        <input type="checkbox" id="cfg-adapt-frags" onchange="toggleAdaptBounds()" style="width:18px;height:18px;cursor:pointer;accent-color:#58a6ff">
+        <span class="settings-hint">automaticky p&#345;izp&#367;sobovat po&#269;et fragment&#367; podle rychlosti</span>
+      </div>
+      <div class="settings-row" id="adapt-bounds-row">
+        <label>Rozsah adapt. (min&nbsp;/&nbsp;max)</label>
+        <input type="number" id="cfg-adapt-min" class="settings-input-num" min="1" max="32" style="width:70px">
+        <span style="color:#484f58;padding:0 6px">&#8211;</span>
+        <input type="number" id="cfg-adapt-max" class="settings-input-num" min="1" max="32" style="width:70px">
+        <span class="settings-hint">rozsah auto-adapt</span>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -286,6 +322,7 @@ HTML = r"""<!DOCTYPE html>
           <option value="bv[height<=720]+ba/b">Max 720p</option>
           <option value="bv[height<=480]+ba/b">Max 480p</option>
           <option value="worst/w">Nejmen&#353;&#237; soubor</option>
+          <option value="ba/b">Jen audio (MP3)</option>
         </select>
       </div>
     </div>
@@ -326,11 +363,6 @@ HTML = r"""<!DOCTYPE html>
         <label>FFmpeg cesta</label>
         <input type="text" id="cfg-ffmpeg-path" class="settings-input" placeholder="/opt/homebrew/bin/ffmpeg">
       </div>
-    </div>
-
-    <div class="settings-actions">
-      <button class="btn" onclick="saveSettings()">Ulo&#382;it nastaven&#237;</button>
-      <span id="settings-toast"></span>
     </div>
 
   </div>
@@ -421,7 +453,7 @@ async function downloadAll() {
     const r = await fetch('/api/add_bulk', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({urls: stagedUrls})
+      body: JSON.stringify({urls: stagedUrls, audio_only: document.getElementById('audio-only-chk').checked})
     });
     const d = await r.json();
     showToast('Zahájeno: ' + d.added + '/' + d.total + ' ✓', '#3fb950');
@@ -461,7 +493,33 @@ document.getElementById('out-dir-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') changeOutDir();
 });
 
+let _prevVideoFormat = 'bv*+ba/b';
+
+function syncAudioCheckbox(fmt) {
+  const chk = document.getElementById('audio-only-chk');
+  const lbl = document.getElementById('audio-chk-label');
+  const isAudio = fmt === 'ba/b';
+  chk.checked = isAudio;
+  lbl.classList.toggle('active', isAudio);
+}
+
+function toggleAudioOnly() {
+  const chk = document.getElementById('audio-only-chk');
+  const sel = document.getElementById('fmt-select');
+  if (chk.checked) {
+    _prevVideoFormat = sel.value !== 'ba/b' ? sel.value : _prevVideoFormat;
+    changeFormat('ba/b');
+  } else {
+    changeFormat(_prevVideoFormat);
+  }
+}
+
 async function changeFormat(fmt) {
+  const sel = document.getElementById('fmt-select');
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === fmt) { sel.selectedIndex = i; break; }
+  }
+  syncAudioCheckbox(fmt);
   await fetch('/api/set_format', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({fmt})
   });
@@ -501,9 +559,10 @@ function fmtSize(b) {
 // ── render jobs ──
 function renderJob(j) {
   const labels = {downloading:'Stahuje', queued:'Ve frontě', pending:'Čeká', done:'Hotovo', fail:'Chyba'};
+  const audioBadge = j.audio_only ? '<span class="audio-badge">MP3</span>' : '';
   const titleHtml = j.title
-    ? '<div class="t-title">'+esc(j.title)+'</div><div class="t-url">'+esc(j.url)+'</div>'
-    : '<div class="t-url" style="color:#8b949e">'+esc(j.url)+'</div>';
+    ? '<div class="t-title">'+esc(j.title)+audioBadge+'</div><div class="t-url">'+esc(j.url)+'</div>'
+    : '<div class="t-url" style="color:#8b949e">'+esc(j.url)+audioBadge+'</div>';
 
   let progHtml = '', actHtml = '';
 
@@ -577,6 +636,7 @@ async function refresh() {
     document.getElementById('s-fail').textContent   = s.fail;
     document.getElementById('workers-val').textContent = s.workers;
     document.getElementById('frags-val').textContent   = s.concurrent_fragments;
+    document.getElementById('adapt-badge').style.display = s.auto_adapt ? '' : 'none';
     document.getElementById('shutdown-banner').style.display = s.shutting_down ? 'inline' : 'none';
 
     if (!folderReady) {
@@ -585,6 +645,7 @@ async function refresh() {
       for (let i = 0; i < sel.options.length; i++) {
         if (sel.options[i].value === s.format) { sel.selectedIndex = i; break; }
       }
+      syncAudioCheckbox(s.format);
       folderReady = true;
     }
 
@@ -595,7 +656,7 @@ async function refresh() {
       tbody.innerHTML = d.jobs.map(renderJob).join('');
     }
     document.getElementById('statusline').textContent =
-      'Workers: '+s.workers+' · Frags: '+s.concurrent_fragments+' | Aktualizováno: '+new Date().toLocaleTimeString('cs-CZ');
+      'Workers: '+s.workers+' · Frags: '+s.concurrent_fragments+(s.auto_adapt?' (auto)':'')+' | Aktualizováno: '+new Date().toLocaleTimeString('cs-CZ');
   } catch(e) {
     document.getElementById('statusline').textContent = 'Spojení ztraceno – opakuji…';
   }
@@ -625,6 +686,10 @@ async function loadSettings() {
     document.getElementById('cfg-retry-delay').value           = d.retry_base_delay;
     document.getElementById('cfg-user-agent').value            = d.user_agent;
     document.getElementById('cfg-ffmpeg-path').value           = d.ffmpeg_path;
+    document.getElementById('cfg-adapt-frags').checked         = d.adapt_frags;
+    document.getElementById('cfg-adapt-min').value             = d.adapt_min_frags;
+    document.getElementById('cfg-adapt-max').value             = d.adapt_max_frags;
+    toggleAdaptBounds();
     settingsLoaded = true;
   } catch(e) {
     showSettingsToast('Chyba načítání nastavení', '#f85149');
@@ -644,6 +709,9 @@ async function saveSettings() {
     retry_base_delay:     parseFloat(document.getElementById('cfg-retry-delay').value) || 10,
     user_agent:           document.getElementById('cfg-user-agent').value.trim(),
     ffmpeg_path:          document.getElementById('cfg-ffmpeg-path').value.trim(),
+    adapt_frags:          document.getElementById('cfg-adapt-frags').checked,
+    adapt_min_frags:      parseInt(document.getElementById('cfg-adapt-min').value) || 1,
+    adapt_max_frags:      parseInt(document.getElementById('cfg-adapt-max').value) || 16,
   };
   try {
     const r = await fetch('/api/set_config', {
@@ -653,12 +721,12 @@ async function saveSettings() {
     if (d.ok) {
       showSettingsToast('Nastavení uloženo ✓', '#3fb950');
       settingsLoaded = false;
-      // sync staging area
       if (payload.download_dir) document.getElementById('out-dir-input').value = payload.download_dir;
       const stageFmt = document.getElementById('fmt-select');
       for (let i = 0; i < stageFmt.options.length; i++) {
         if (stageFmt.options[i].value === payload.format) { stageFmt.selectedIndex = i; break; }
       }
+      syncAudioCheckbox(payload.format);
     } else {
       showSettingsToast(d.error || 'Chyba', '#f85149');
     }
@@ -677,6 +745,11 @@ async function cfgBrowseFolder() {
   } else if (!d.cancelled) {
     showSettingsToast(d.error || 'Chyba', '#f85149');
   }
+}
+
+function toggleAdaptBounds() {
+  const on = document.getElementById('cfg-adapt-frags').checked;
+  document.getElementById('adapt-bounds-row').style.opacity = on ? '1' : '0.4';
 }
 
 let settingsToastTimer = null;
@@ -752,6 +825,7 @@ async def get_state():
                 "added_at":     time.strftime("%H:%M:%S", time.localtime(j.added_at)) if j.added_at else "",
                 "retry_after":  j.retry_after,
                 "eta_bad":      j.eta_bad,
+                "audio_only":   j.audio_only,
                 "_sort": (
                     {"downloading": 0, "queued": 1, "pending": 2, "fail": 3, "done": 4}.get(j.status, 9),
                     -j.priority,
@@ -770,6 +844,7 @@ async def get_state():
             "fail":                 sum(1 for j in daemon.jobs.values() if j.status == "fail"),
             "workers":              _d()._max_workers,
             "concurrent_fragments": int(_d().cfg.get("concurrent_fragments", 3)),
+            "auto_adapt":           _d()._auto_adapt,
             "format":               _d().cfg.get("format", "bv*+ba/b"),
             "out_dir":              str(daemon.out_dir),
             "shutting_down":        daemon._shutting_down,
@@ -780,6 +855,7 @@ async def get_state():
 
 class BulkReq(BaseModel):
     urls: list[str]
+    audio_only: bool = False
 
 class PrioReq(BaseModel):
     jid: int
@@ -802,11 +878,14 @@ class SetConfigReq(BaseModel):
     retry_base_delay: float | None = None
     user_agent: str | None = None
     ffmpeg_path: str | None = None
+    adapt_frags: bool | None = None
+    adapt_min_frags: int | None = None
+    adapt_max_frags: int | None = None
 
 
 @app.post("/api/add_bulk")
 async def add_bulk(req: BulkReq):
-    return daemon.add_bulk(req.urls)
+    return daemon.add_bulk(req.urls, audio_only=req.audio_only)
 
 
 @app.post("/api/priority")
@@ -888,6 +967,9 @@ async def get_config():
         "retry_base_delay":     d.retry_base_delay,
         "user_agent":           cfg.get("user_agent", ""),
         "ffmpeg_path":          cfg.get("ffmpeg_path", ""),
+        "adapt_frags":          d._auto_adapt,
+        "adapt_min_frags":      int(cfg.get("adapt_min_frags", 1)),
+        "adapt_max_frags":      int(cfg.get("adapt_max_frags", 16)),
     }
 
 
@@ -901,6 +983,8 @@ async def set_config(req: SetConfigReq):
             d.set_workers(req.max_workers)
         if req.format is not None:
             d.set_format(req.format)
+        if req.adapt_frags is not None:
+            d.set_adapt(req.adapt_frags)
         with d.lock:
             if req.concurrent_fragments is not None:
                 d.cfg["concurrent_fragments"] = max(1, req.concurrent_fragments)
@@ -920,6 +1004,10 @@ async def set_config(req: SetConfigReq):
                 d.cfg["user_agent"] = req.user_agent
             if req.ffmpeg_path is not None:
                 d.cfg["ffmpeg_path"] = req.ffmpeg_path
+            if req.adapt_min_frags is not None:
+                d.cfg["adapt_min_frags"] = max(1, req.adapt_min_frags)
+            if req.adapt_max_frags is not None:
+                d.cfg["adapt_max_frags"] = max(1, req.adapt_max_frags)
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}

@@ -1,10 +1,12 @@
 # v7 — plánované změny
 
-## Logika stahování
-
-- **Lepší adaptivní logika** — např. automatické přizpůsobení počtu workerů nebo fragmentů podle aktuální rychlosti připojení; pokud je rychlost nízká, snížit paralelismus; pokud vysoká, zvýšit
+*(vše hotovo)*
 
 ---
+
+## Hotovo v v6.9
+
+- **Adaptivní fragmenty** — hill-climbing algoritmus každých 12s měří celkovou rychlost a +1/-1 upravuje `concurrent_fragments`; při poklesu rychlosti >10 % otočí směr; toggle + rozsah (min/max) v nastavení; v hlavičce badge "auto"
 
 ## Hotovo v v6.8
 

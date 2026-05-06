@@ -36,6 +36,9 @@ def load_config(path: str) -> dict:
     cfg.setdefault("ffmpeg_path", "")
     cfg.setdefault("prefetch_metadata", True)
     cfg.setdefault("prefetch_workers", 1)
+    cfg.setdefault("adapt_frags", True)
+    cfg.setdefault("adapt_min_frags", 1)
+    cfg.setdefault("adapt_max_frags", 16)
     cfg.setdefault("max_retries", 3)
     cfg.setdefault("retry_base_delay", 10)
     cfg.setdefault("state_file", "grabber_state.json")
@@ -140,6 +143,7 @@ class Job:
     retry_count: int = 0
     priority: int = 0
     retry_after: float = 0.0
+    audio_only: bool = False
 
 
 class GrabberDaemon:
@@ -163,6 +167,10 @@ class GrabberDaemon:
         self._max_workers = int(cfg.get("max_workers", 2))
         self._running_workers = 0
         self._worker_lock = threading.Lock()
+
+        self._auto_adapt: bool = bool(cfg.get("adapt_frags", True))
+        self._adapt_direction: int = 1
+        self._adapt_prev_speed: float = 0.0
 
         self.max_retries = int(cfg.get("max_retries", 3))
         self.retry_base_delay = float(cfg.get("retry_base_delay", 10))
@@ -205,7 +213,7 @@ class GrabberDaemon:
 
     # ── public API ──
 
-    def add_url(self, url: str, priority: int = 0) -> str:
+    def add_url(self, url: str, priority: int = 0, audio_only: bool = False) -> str:
         url = (url or "").strip()
         if not url:
             raise ValueError("empty")
@@ -216,19 +224,18 @@ class GrabberDaemon:
             self._jid_counter += 1
             jid = self._jid_counter
             job_id = self._new_job_id(jid)
-            job = Job(jid=jid, job_id=job_id, url=url, added_at=time.time(), priority=priority)
+            job = Job(jid=jid, job_id=job_id, url=url, added_at=time.time(), priority=priority, audio_only=audio_only)
             self.jobs[job_id] = job
             self._jid_index[jid] = job_id
-            # Always enqueue immediately — feeder handles overflow via pending list
             self._enqueue_locked(job_id)
         return job_id
 
-    def add_bulk(self, urls: list[str]) -> dict:
+    def add_bulk(self, urls: list[str], audio_only: bool = False) -> dict:
         added = 0
         skipped = 0
         for u in urls:
             try:
-                self.add_url(u.strip())
+                self.add_url(u.strip(), audio_only=audio_only)
                 added += 1
             except ValueError:
                 skipped += 1
@@ -311,6 +318,11 @@ class GrabberDaemon:
         with self.lock:
             self.cfg["format"] = fmt.strip()
 
+    def set_adapt(self, enabled: bool) -> None:
+        self._auto_adapt = enabled
+        with self.lock:
+            self.cfg["adapt_frags"] = enabled
+
     # ── state persistence ──
 
     def _save_state(self):
@@ -332,6 +344,7 @@ class GrabberDaemon:
                             "finished_at": j.finished_at,
                             "error": j.error,
                             "final_path": j.final_path,
+                            "audio_only": j.audio_only,
                         }
                         for j in self.jobs.values()
                     ],
@@ -373,6 +386,7 @@ class GrabberDaemon:
                 retry_count=int(jd.get("retry_count", 0)),
                 title=str(jd.get("title", "")),
                 added_at=float(jd.get("added_at", time.time())),
+                audio_only=bool(jd.get("audio_only", False)),
             )
             self.jobs[job.job_id] = job
             self._jid_index[jid] = job.job_id
@@ -383,6 +397,12 @@ class GrabberDaemon:
         return restored
 
     # ── yt-dlp ──
+
+    def _ffmpeg_available(self, ffmpeg_loc: str) -> bool:
+        import shutil
+        if ffmpeg_loc:
+            return Path(ffmpeg_loc).is_file()
+        return shutil.which("ffmpeg") is not None
 
     def _build_ydl_opts(self, job: Job) -> dict:
         if job.title:
@@ -430,10 +450,19 @@ class GrabberDaemon:
                 elif st == "error":
                     j.status = "fail"
 
+        if job.audio_only:
+            if self._ffmpeg_available(ffmpeg_loc):
+                opts_fmt = "ba/b"
+                post = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
+            else:
+                opts_fmt = "ba[ext=m4a]/ba/b"
+                post = []
+        else:
+            opts_fmt = self.cfg["format"]
+            post = []
+
         opts = {
-            "format": self.cfg["format"],
-            "merge_output_format": "mp4",
-            "remuxvideo": "mp4",
+            "format": opts_fmt,
             "outtmpl": outtmpl,
             "retries": retries,
             "fragment_retries": fragment_retries,
@@ -446,6 +475,11 @@ class GrabberDaemon:
             "http_headers": headers,
             "progress_hooks": [hook],
         }
+        if post:
+            opts["postprocessors"] = post
+        if not job.audio_only:
+            opts["merge_output_format"] = "mp4"
+            opts["remuxvideo"] = "mp4"
         if ffmpeg_loc:
             opts["ffmpeg_location"] = ffmpeg_loc
         return opts
@@ -577,6 +611,30 @@ class GrabberDaemon:
             time.sleep(10)
             self._save_state()
 
+    def _adaptive_loop(self):
+        """Hill-climb concurrent_fragments every 12s to maximise observed throughput."""
+        while not self.stop_event.is_set():
+            time.sleep(12)
+            if not self._auto_adapt:
+                self._adapt_prev_speed = 0.0
+                self._adapt_direction = 1
+                continue
+            with self.lock:
+                active = [j for j in self.jobs.values() if j.status == "downloading"]
+                if not active:
+                    self._adapt_prev_speed = 0.0
+                    continue
+                total_speed = sum(j.speed for j in active)
+                cur_frags = int(self.cfg.get("concurrent_fragments", 3))
+                min_f = int(self.cfg.get("adapt_min_frags", 1))
+                max_f = int(self.cfg.get("adapt_max_frags", 16))
+                # if speed dropped >10 % compared to last sample, reverse direction
+                if self._adapt_prev_speed > 0 and total_speed < self._adapt_prev_speed * 0.9:
+                    self._adapt_direction = -self._adapt_direction
+                new_frags = max(min_f, min(max_f, cur_frags + self._adapt_direction))
+                self.cfg["concurrent_fragments"] = new_frags
+                self._adapt_prev_speed = total_speed
+
     def start(self):
         for _ in range(self._max_workers):
             threading.Thread(target=self.worker_loop, daemon=True).start()
@@ -585,3 +643,4 @@ class GrabberDaemon:
                 threading.Thread(target=self.meta_loop, daemon=True).start()
         threading.Thread(target=self.feeder_loop, daemon=True).start()
         threading.Thread(target=self._state_save_loop, daemon=True).start()
+        threading.Thread(target=self._adaptive_loop, daemon=True).start()
