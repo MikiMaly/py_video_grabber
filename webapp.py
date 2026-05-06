@@ -186,6 +186,11 @@ HTML = r"""<!DOCTYPE html>
   /* ── version badge ── */
   .version-badge { font-size: 11px; color: #484f58; font-weight: 400; margin-left: 10px; }
 
+  /* ── download app button ── */
+  .dl-app-btn { font-size: 12px; color: #58a6ff; border: 1px solid #30363d; border-radius: 6px;
+                padding: 4px 10px; text-decoration: none; white-space: nowrap; }
+  .dl-app-btn:hover { background: #1f2937; border-color: #58a6ff; }
+
   /* ── audio checkbox ── */
   .audio-chk-label { display: flex; align-items: center; gap: 5px; font-size: 12px;
                      color: #8b949e; cursor: pointer; white-space: nowrap; user-select: none;
@@ -207,6 +212,7 @@ HTML = r"""<!DOCTYPE html>
 
 <header>
   <h1><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAABv0lEQVR4nO2WzStEURjGn3NmzCRSPhqhIUbMrFghGXE2s7GlbC1kOanZ2FpQbP0LbJGVj1uUhZRSZqRpsKCYuUJq0P3S3MztuI0xlzuT4lmdznvO87vve99TLwEnT1ObhiIoeX1OsmtiBrGFxIGdMCHi6+XBTjOIP2CHmMmX8tnZDTN7Zlg0+xW5YBX17XBV1gKEoNrXh5qOoBGr6RjQ43UBpscI0a1yKuOdzdQoaS419o7jPr6Pu7Nd+EfnkBYvIT8/QlUkeIMTSKcu4HCVQ1MkNPSMIbYyja+UF/hBmobbozV4ukegSi+4OVpFlbcLYnQb4qmA/pk9vRLQ8jc6zctQJNAyN6jTrWeVim6iLjCM2s5BiCdbxjlCHQXBvsxQjO3APzaP5qFJJI83oLym8XQVhabKUKRn/UxrKIwWNoXLnSUUorzAh4tDHCyGQIgDqvyq70WXw0Y8vj5bEMTSP9QUGRpk2CVqm9NvBTq/c4ktJIy1EPFZuktRYtF/4N/qUsZ1p3mv0G6lVoCfmVp5GtQKMJd5Sd6h8A6xCvtR03wHZgD5maMYYtzMRPkhtRhQxnlmWCUfhI3szGA7xVfxDT+Ds/ZCpq+GAAAAAElFTkSuQmCC" alt="" style="width:22px;height:22px;vertical-align:middle;margin-right:8px;"> Ultimate Video Downloader <span class="version-badge">v7 &middot; exe build</span></h1>
+  <a class="dl-app-btn" href="https://github.com/MikiMaly/py_video_grabber/releases/latest" target="_blank">&#11015; St&aacute;hnout aplikaci</a>
   <span id="shutdown-banner">&#9888; Shutting down&hellip;</span>
   <label class="audio-chk-label" id="audio-chk-label" title="Sta&#382;en&#237; jen zvuku (MP3 / M4A)">
     <input type="checkbox" id="audio-only-chk" onchange="toggleAudioOnly()"> Jen audio
