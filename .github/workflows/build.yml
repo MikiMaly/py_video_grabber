@@ -1,4 +1,4 @@
-name: Build EXE
+name: Build
 
 on:
   push:
@@ -9,9 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -39,11 +38,70 @@ jobs:
 
       - name: Create ZIP
         shell: pwsh
+        run: Compress-Archive -Path dist\UltimateVideoDownloader\* -DestinationPath UltimateVideoDownloader-win64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: UltimateVideoDownloader-win64.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install fastapi "uvicorn[standard]" yt-dlp pyyaml pyinstaller pyinstaller-hooks-contrib
+
+      - name: Build app
         run: |
-          Compress-Archive -Path dist\UltimateVideoDownloader\* -DestinationPath "UltimateVideoDownloader-${{ github.ref_name }}-win64.zip"
+          pyinstaller --onefile \
+            --name UltimateVideoDownloader \
+            --icon icon.ico \
+            --collect-all yt_dlp \
+            --hidden-import uvicorn.logging \
+            --hidden-import uvicorn.loops \
+            --hidden-import uvicorn.loops.auto \
+            --hidden-import uvicorn.protocols \
+            --hidden-import uvicorn.protocols.http \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.protocols.http.h11_impl \
+            --hidden-import uvicorn.lifespan \
+            --hidden-import uvicorn.lifespan.on \
+            --hidden-import uvicorn.main \
+            webapp.py
+
+      - name: Create DMG
+        run: |
+          mkdir -p dist/dmg_tmp
+          cp dist/UltimateVideoDownloader dist/dmg_tmp/
+          cp config.yaml dist/dmg_tmp/
+          printf 'Jak spustit:\n1. Otevri Terminal v teto slozce\n2. chmod +x UltimateVideoDownloader && ./UltimateVideoDownloader\n3. Prohlizec se otevri na http://localhost:8080\n' > dist/dmg_tmp/SPUSTENI.txt
+          hdiutil create -volname UltimateVideoDownloader -srcfolder dist/dmg_tmp -ov -format UDZO UltimateVideoDownloader-macos.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: UltimateVideoDownloader-macos.dmg
+
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: "UltimateVideoDownloader-${{ github.ref_name }}-win64.zip"
+          files: |
+            windows/UltimateVideoDownloader-win64.zip
+            macos/UltimateVideoDownloader-macos.dmg
           generate_release_notes: true
