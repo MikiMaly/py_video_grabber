@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+import os
 import sys
 import time
 import threading
@@ -13,6 +14,7 @@ from tkinter import filedialog
 if getattr(sys, "frozen", False):
     _base = Path(sys._MEIPASS)          # type: ignore[attr-defined]
     _exe_dir = Path(sys.executable).parent
+    os.environ['PATH'] = str(_exe_dir) + os.pathsep + os.environ.get('PATH', '')
 else:
     _base = Path(__file__).parent
     _exe_dir = Path(__file__).parent
@@ -43,6 +45,7 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ultimate Video Downloader</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABzUlEQVR4nGNkQAJi0kr/GegAXj29xwhjM6Jb7tR99yQtLd9XqmyO7AhGdMthCmgFkO0AOYKRnpZjcwQTvS0HAZBdsKhmIaRY0S2fgZGJmeHejj4GJY8ihv///jKI6rgz3NrQyPDh3kkGVb9ahl9f3jAwsbAxKLrmMfz//4/h44OzDJcXZjH8/vqOoGOYyPHBy/MbGUR13MBsES1nhpfnN4PZD/ZOZThYpcPw490TBlnbBKLMYiKo4j9azvz/n+Hl+U0MojouDDxSmgw/P71k+PH+CVz635+fDO/vHGfgElWkjgP+/vzKwCOhzsDCwcvAJarE8OfnF4YfH54z/Hj/jEHJrQAcGsiAkZmFgV/BmOH7m4fUccDLC1sY2AUkGWwbzjBwCskyvLqwFSz+4vxGBmENB4ZXF7fB1So4ZzM4tF5l4BJTZnh0aB5RDmAhpAAUxKcn+GGIPzuxAoxh4P6uiWBMKmBiGGDANNAOYKFEs1P3XTh7X6ny0AwBplEHMIxGwUiPAhZK8z+6GKnlARM5DsBlCTmFERM5DsBm2cgsCfdBfU2u7yl2AKWWU8UBlAIm9HY63Tsmr6B9NHo5AqNrxgAFA9o5RXcErQFy9xwAPPzHm2LbwvUAAAAASUVORK5CYII=">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif;
@@ -203,7 +206,7 @@ HTML = r"""<!DOCTYPE html>
 <body>
 
 <header>
-  <h1>&#9660; Ultimate Video Downloader <span class="version-badge">v6.9 &middot; autospeed + audio update</span></h1>
+  <h1><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAABv0lEQVR4nO2WzStEURjGn3NmzCRSPhqhIUbMrFghGXE2s7GlbC1kOanZ2FpQbP0LbJGVj1uUhZRSZqRpsKCYuUJq0P3S3MztuI0xlzuT4lmdznvO87vve99TLwEnT1ObhiIoeX1OsmtiBrGFxIGdMCHi6+XBTjOIP2CHmMmX8tnZDTN7Zlg0+xW5YBX17XBV1gKEoNrXh5qOoBGr6RjQ43UBpscI0a1yKuOdzdQoaS419o7jPr6Pu7Nd+EfnkBYvIT8/QlUkeIMTSKcu4HCVQ1MkNPSMIbYyja+UF/hBmobbozV4ukegSi+4OVpFlbcLYnQb4qmA/pk9vRLQ8jc6zctQJNAyN6jTrWeVim6iLjCM2s5BiCdbxjlCHQXBvsxQjO3APzaP5qFJJI83oLym8XQVhabKUKRn/UxrKIwWNoXLnSUUorzAh4tDHCyGQIgDqvyq70WXw0Y8vj5bEMTSP9QUGRpk2CVqm9NvBTq/c4ktJIy1EPFZuktRYtF/4N/qUsZ1p3mv0G6lVoCfmVp5GtQKMJd5Sd6h8A6xCvtR03wHZgD5maMYYtzMRPkhtRhQxnlmWCUfhI3szGA7xVfxDT+Ds/ZCpq+GAAAAAElFTkSuQmCC" alt="" style="width:22px;height:22px;vertical-align:middle;margin-right:8px;"> Ultimate Video Downloader <span class="version-badge">v7 &middot; exe build</span></h1>
   <span id="shutdown-banner">&#9888; Shutting down&hellip;</span>
   <label class="audio-chk-label" id="audio-chk-label" title="Sta&#382;en&#237; jen zvuku (MP3 / M4A)">
     <input type="checkbox" id="audio-only-chk" onchange="toggleAudioOnly()"> Jen audio
