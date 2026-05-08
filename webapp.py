@@ -214,17 +214,14 @@ HTML = r"""<!DOCTYPE html>
   <h1><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAABv0lEQVR4nO2WzStEURjGn3NmzCRSPhqhIUbMrFghGXE2s7GlbC1kOanZ2FpQbP0LbJGVj1uUhZRSZqRpsKCYuUJq0P3S3MztuI0xlzuT4lmdznvO87vve99TLwEnT1ObhiIoeX1OsmtiBrGFxIGdMCHi6+XBTjOIP2CHmMmX8tnZDTN7Zlg0+xW5YBX17XBV1gKEoNrXh5qOoBGr6RjQ43UBpscI0a1yKuOdzdQoaS419o7jPr6Pu7Nd+EfnkBYvIT8/QlUkeIMTSKcu4HCVQ1MkNPSMIbYyja+UF/hBmobbozV4ukegSi+4OVpFlbcLYnQb4qmA/pk9vRLQ8jc6zctQJNAyN6jTrWeVim6iLjCM2s5BiCdbxjlCHQXBvsxQjO3APzaP5qFJJI83oLym8XQVhabKUKRn/UxrKIwWNoXLnSUUorzAh4tDHCyGQIgDqvyq70WXw0Y8vj5bEMTSP9QUGRpk2CVqm9NvBTq/c4ktJIy1EPFZuktRYtF/4N/qUsZ1p3mv0G6lVoCfmVp5GtQKMJd5Sd6h8A6xCvtR03wHZgD5maMYYtzMRPkhtRhQxnlmWCUfhI3szGA7xVfxDT+Ds/ZCpq+GAAAAAElFTkSuQmCC" alt="" style="width:22px;height:22px;vertical-align:middle;margin-right:8px;"> Ultimate Video Downloader <span class="version-badge">v7 &middot; exe build</span></h1>
   <a class="dl-app-btn" href="https://github.com/MikiMaly/py_video_grabber/releases/latest" target="_blank">&#11015; St&aacute;hnout aplikaci</a>
   <span id="shutdown-banner">&#9888; Shutting down&hellip;</span>
-  <label class="audio-chk-label" id="audio-chk-label" title="Sta&#382;en&#237; jen zvuku (MP3 / M4A)">
-    <input type="checkbox" id="audio-only-chk" onchange="toggleAudioOnly()"> Jen audio
-  </label>
   <div class="stat s-active"><span class="stat-val" id="s-active">0</span><span class="stat-lbl">active</span></div>
   <div class="stat s-queue" ><span class="stat-val" id="s-queue" >0</span><span class="stat-lbl">queue</span></div>
   <div class="stat s-done"  ><span class="stat-val" id="s-done"  >0</span><span class="stat-lbl">done</span></div>
-  <div class="stat s-fail"  ><span class="stat-val" id="s-fail"  >0</span><span class="stat-lbl">fail</span></div>
+  <div class="stat s-fail"  ><span class="stat-val" id="s-fail"  >0</span><span class="stat-lbl">selhalo</span></div>
   <div class="workers-disp">
-    <span id="workers-val">?</span><span class="stat-lbl">workers</span>
+    <span id="workers-val">?</span><span class="stat-lbl">sloty</span>
     <span class="sep">|</span>
-    <span id="frags-val">?</span><span id="adapt-badge" style="display:none;font-size:10px;color:#3fb950;padding-left:3px">auto</span><span class="stat-lbl">frags</span>
+    <span id="frags-val">?</span><span id="adapt-badge" style="display:none;font-size:10px;color:#3fb950;padding-left:3px">auto</span><span class="stat-lbl">seg.</span>
   </div>
 </header>
 
@@ -248,6 +245,9 @@ HTML = r"""<!DOCTYPE html>
     </div>
     <div class="stage-footer">
       <button class="btn" id="btn-dl-all" onclick="downloadAll()" disabled>&#9654; Sta&#382;en&#237; (0)</button>
+      <label class="audio-chk-label" id="audio-chk-label" title="Sta&#382;en&#237; jen zvuku (MP3 / M4A)">
+        <input type="checkbox" id="audio-only-chk" onchange="toggleAudioOnly()"> Jen audio
+      </label>
       <button class="btn btn-danger" id="btn-clear" onclick="clearStaging()" style="display:none">&#10005; Zru&#353;it v&#353;e</button>
       <div class="folder-row">
         <select class="fmt-select" id="fmt-select" onchange="changeFormat(this.value)" title="Form&#225;t">
@@ -298,18 +298,18 @@ HTML = r"""<!DOCTYPE html>
         <button class="btn-sm" onclick="cfgBrowseFolder()">&#128193;</button>
       </div>
       <div class="settings-row">
-        <label>Workers</label>
+        <label>Stahování najednou</label>
         <input type="number" id="cfg-workers" class="settings-input-num" min="1" max="16">
         <span class="settings-hint">1&ndash;16 paraleln&#237;ch stahov&#225;n&#237;</span>
       </div>
       <div class="settings-row">
-        <label>Concurrent fragments</label>
+        <label>Segmenty najednou</label>
         <input type="number" id="cfg-concurrent-fragments" class="settings-input-num" min="1" max="32">
-        <span class="settings-hint">fragmenty jednoho videa paraleln&#283;</span>
+        <span class="settings-hint">&#269;&#225;sti jednoho videa sta&#382;en&#233; paraleln&#283;</span>
       </div>
       <div class="settings-row">
-        <label>Auto-adapt fragmenty</label>
-        <input type="checkbox" id="cfg-adapt-frags" onchange="toggleAdaptBounds()" style="width:18px;height:18px;cursor:pointer;accent-color:#58a6ff">
+        <label>Auto-adapt segmentů</label>
+        <input type="checkbox" id="cfg-adapt-frags" onchange="toggleAdaptBounds()" style="width:18px;height:18px;cursor:pointer;accent-color:#3fb950">
         <span class="settings-hint">automaticky p&#345;izp&#367;sobovat po&#269;et fragment&#367; podle rychlosti</span>
       </div>
       <div class="settings-row" id="adapt-bounds-row">
@@ -665,7 +665,7 @@ async function refresh() {
       tbody.innerHTML = d.jobs.map(renderJob).join('');
     }
     document.getElementById('statusline').textContent =
-      'Workers: '+s.workers+' · Frags: '+s.concurrent_fragments+(s.auto_adapt?' (auto)':'')+' | Aktualizováno: '+new Date().toLocaleTimeString('cs-CZ');
+      s.workers+' slot'+(s.workers===1?'':'y')+' · '+s.concurrent_fragments+' seg.'+(s.auto_adapt?' (auto)':'')+' | Aktualizováno: '+new Date().toLocaleTimeString('cs-CZ');
   } catch(e) {
     document.getElementById('statusline').textContent = 'Spojení ztraceno – opakuji…';
   }
