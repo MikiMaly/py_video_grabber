@@ -1,6 +1,7 @@
 # TODO
 
 ## Aktivní
+- [ ] Sjednotit design s hubem (mmaly.cz) — stejné fonty (Inter + JetBrains Mono), stejné CSS proměnné (--bg, --accent #3fb950, border-radius, atd.), konzistentní look-and-feel
 - [x] ~~Zelený rebrand ikony~~ — hotovo ve v7.2 (PNG sady 16–512 + .ico)
 
 ## Nápady / koncepty
