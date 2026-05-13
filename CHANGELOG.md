@@ -1,5 +1,26 @@
 # Changelog
 
+## v7.3
+- URL input pole 2× větší (font 17px, padding 22px) + drag-and-drop linků z prohlížeče i textu
+- Fronta (stage-list) se rozšiřuje s počtem položek až do 40vh místo fixních 130px
+- Zelený focus glow na URL inputu
+
+## v7.2
+- Přejmenování UI termínů: Workers → "Stahování najednou" / "sloty", Concurrent fragments → "Segmenty najednou" / "seg.", fail → "selhalo"
+- "Jen audio" checkbox přesunut z headeru přímo k tlačítku Stáhnout
+- Status line dole zjednodušená: `2 sloty · 3 seg.`
+- Zelený rebrand UVD ikony (modrá → zelená, všechny velikosti 16–512px + .ico)
+
+## v7.1
+- macOS build job v GitHub Actions (DMG) + Windows build běží paralelně
+- Stabilní release filenames (`UltimateVideoDownloader-win64.zip`, `-macos.dmg`) pro přímé download linky
+- "Stáhnout aplikaci" tlačítko v headeru míří na `/releases/latest`
+
+## v7.0
+- PyInstaller spec — single-file EXE build
+- GitHub Actions CI — automatický build při push tagu `v*`
+- Vlastní ikona (UVD logo) + favicon
+
 ## v6.9
 - Adaptivní fragmenty — hill-climbing algoritmus každých 12s měří celkovou rychlost a ±1 upravuje `concurrent_fragments`; při poklesu rychlosti >10 % otočí směr; toggle + rozsah (min/max) v nastavení; badge "auto" v hlavičce
 - Per-job audio mode — checkbox "Jen audio" v headeru; každý job má vlastní příznak; stahuje audio odděleně
