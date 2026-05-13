@@ -83,12 +83,16 @@ HTML = r"""<!DOCTYPE html>
 
   /* ── staging ── */
   .staging { flex-shrink: 0; background: #161b22; border-bottom: 2px solid #30363d; }
-  .stage-input-row { display: flex; gap: 8px; align-items: center; padding: 10px 20px; border-bottom: 1px solid #21262d; }
-  .stage-input-row input { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
-                            padding: 8px 12px; color: #c9d1d9; font-size: 14px; outline: none; transition: border-color .15s; }
-  .stage-input-row input:focus { border-color: #58a6ff; }
+  .stage-input-row { display: flex; gap: 10px; align-items: center; padding: 28px 20px; border-bottom: 1px solid #21262d;
+                     transition: background .15s; }
+  .stage-input-row.drag-over { background: rgba(63,185,80,0.08); }
+  .stage-input-row.drag-over input { border-color: #3fb950; box-shadow: 0 0 0 3px rgba(63,185,80,0.18); }
+  .stage-input-row input { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+                            padding: 22px 18px; color: #c9d1d9; font-size: 17px; outline: none;
+                            transition: border-color .15s, box-shadow .15s; }
+  .stage-input-row input:focus { border-color: #3fb950; box-shadow: 0 0 0 2px rgba(63,185,80,0.15); }
   .stage-input-row input::placeholder { color: #484f58; }
-  .stage-list { max-height: 130px; overflow-y: auto; }
+  .stage-list { max-height: 40vh; overflow-y: auto; }
   .stage-item { display: flex; align-items: center; gap: 8px; padding: 4px 20px; border-bottom: 1px solid #21262d; }
   .stage-item:last-child { border-bottom: none; }
   .stage-url { flex: 1; font-size: 12px; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -211,7 +215,7 @@ HTML = r"""<!DOCTYPE html>
 <body>
 
 <header>
-  <h1><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAABv0lEQVR4nO2WzStEURjGn3NmzCRSPhqhIUbMrFghGXE2s7GlbC1kOanZ2FpQbP0LbJGVj1uUhZRSZqRpsKCYuUJq0P3S3MztuI0xlzuT4lmdznvO87vve99TLwEnT1ObhiIoeX1OsmtiBrGFxIGdMCHi6+XBTjOIP2CHmMmX8tnZDTN7Zlg0+xW5YBX17XBV1gKEoNrXh5qOoBGr6RjQ43UBpscI0a1yKuOdzdQoaS419o7jPr6Pu7Nd+EfnkBYvIT8/QlUkeIMTSKcu4HCVQ1MkNPSMIbYyja+UF/hBmobbozV4ukegSi+4OVpFlbcLYnQb4qmA/pk9vRLQ8jc6zctQJNAyN6jTrWeVim6iLjCM2s5BiCdbxjlCHQXBvsxQjO3APzaP5qFJJI83oLym8XQVhabKUKRn/UxrKIwWNoXLnSUUorzAh4tDHCyGQIgDqvyq70WXw0Y8vj5bEMTSP9QUGRpk2CVqm9NvBTq/c4ktJIy1EPFZuktRYtF/4N/qUsZ1p3mv0G6lVoCfmVp5GtQKMJd5Sd6h8A6xCvtR03wHZgD5maMYYtzMRPkhtRhQxnlmWCUfhI3szGA7xVfxDT+Ds/ZCpq+GAAAAAElFTkSuQmCC" alt="" style="width:22px;height:22px;vertical-align:middle;margin-right:8px;"> Ultimate Video Downloader <span class="version-badge">v7 &middot; exe build</span></h1>
+  <h1><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAABv0lEQVR4nO2WzStEURjGn3NmzCRSPhqhIUbMrFghGXE2s7GlbC1kOanZ2FpQbP0LbJGVj1uUhZRSZqRpsKCYuUJq0P3S3MztuI0xlzuT4lmdznvO87vve99TLwEnT1ObhiIoeX1OsmtiBrGFxIGdMCHi6+XBTjOIP2CHmMmX8tnZDTN7Zlg0+xW5YBX17XBV1gKEoNrXh5qOoBGr6RjQ43UBpscI0a1yKuOdzdQoaS419o7jPr6Pu7Nd+EfnkBYvIT8/QlUkeIMTSKcu4HCVQ1MkNPSMIbYyja+UF/hBmobbozV4ukegSi+4OVpFlbcLYnQb4qmA/pk9vRLQ8jc6zctQJNAyN6jTrWeVim6iLjCM2s5BiCdbxjlCHQXBvsxQjO3APzaP5qFJJI83oLym8XQVhabKUKRn/UxrKIwWNoXLnSUUorzAh4tDHCyGQIgDqvyq70WXw0Y8vj5bEMTSP9QUGRpk2CVqm9NvBTq/c4ktJIy1EPFZuktRYtF/4N/qUsZ1p3mv0G6lVoCfmVp5GtQKMJd5Sd6h8A6xCvtR03wHZgD5maMYYtzMRPkhtRhQxnlmWCUfhI3szGA7xVfxDT+Ds/ZCpq+GAAAAAElFTkSuQmCC" alt="" style="width:22px;height:22px;vertical-align:middle;margin-right:8px;"> Ultimate Video Downloader <span class="version-badge">v7.3 &middot; exe build</span></h1>
   <a class="dl-app-btn" href="https://github.com/MikiMaly/py_video_grabber/releases/latest" target="_blank">&#11015; St&aacute;hnout aplikaci</a>
   <span id="shutdown-banner">&#9888; Shutting down&hellip;</span>
   <div class="stat s-active"><span class="stat-val" id="s-active">0</span><span class="stat-lbl">active</span></div>
@@ -235,7 +239,7 @@ HTML = r"""<!DOCTYPE html>
   <div class="staging">
     <div class="stage-input-row">
       <input type="text" id="url-input"
-             placeholder="URL nebo domena.com/video &mdash; Enter nebo klikni P&#345;idat&hellip;"
+             placeholder="URL nebo domena.com/video &mdash; Enter, P&#345;idat, nebo p&#345;eta&#382;en&#237;m&hellip;"
              autocomplete="off" spellcheck="false">
       <button class="btn" onclick="addToStaging()">+ P&#345;idat</button>
       <span id="toast"></span>
@@ -412,6 +416,28 @@ urlInput.addEventListener('paste', () => {
       renderStaging();
     }
   }, 0);
+});
+
+// ── drag-and-drop URL ──
+const dropZone = document.querySelector('.stage-input-row');
+['dragenter','dragover'].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag-over'); })
+);
+['dragleave','drop'].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); if (ev === 'dragleave' && e.target !== dropZone) return; dropZone.classList.remove('drag-over'); })
+);
+dropZone.addEventListener('drop', e => {
+  const dt = e.dataTransfer;
+  if (!dt) return;
+  // try URL list first (browser address-bar drag), then plain text
+  const raw = dt.getData('text/uri-list') || dt.getData('text/plain') || '';
+  if (!raw) return;
+  const tokens = raw.split(/[\s,;]+/);
+  let added = 0;
+  tokens.forEach(t => { const u = normalizeUrl(t); if (u && pushStaged(u)) added++; });
+  renderStaging();
+  if (added) showToast(added + ' URL přidáno ✓', '#3fb950');
+  else showToast('Žádné platné URL');
 });
 
 function pushStaged(url) {
