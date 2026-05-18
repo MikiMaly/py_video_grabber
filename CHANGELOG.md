@@ -1,5 +1,18 @@
 # Changelog
 
+## v8.0 — design refresh
+- Hero header: gradient title (`#22c55e → #14b8a6`), stat-karty s SVG ikonami a hover lift
+- Job tabulka → karty s barevným accent paskem, gradient progress barem + glow, pulse halo na downloading
+- Hub palette: bg `#0a0e1a`, card `#131825`, primary `#22c55e`, sjednocené status barvy s hubem (mmaly.cz)
+- Lucide SVG ikony (download, settings, prio/cancel/retry) místo unicode znaků
+- Floating toasty vpravo dole se slide-in animací místo inline toast spanů
+- Empty states s ilustrací (inbox icon) pro prázdnou frontu
+- Animace: card-in, pulse-halo, blink status dotu, stage-in, fade-in tabů, hover lifty
+- Reorg headeru: sloty/seg. + Stáhnout aplikaci přesunuté z headeru do tab-nav řádku (vpravo)
+- Tab title v prohlížeči zobrazuje progres `(2↓ 38⏳) Ultimate Video Downloader` při stahování
+- Inter font preferovaný (fallback Segoe UI / system-ui)
+- Tab Stahování/Nastavení → jen SVG ikony s tooltipem
+
 ## v7.3
 - URL input pole 2× větší (font 17px, padding 22px) + drag-and-drop linků z prohlížeče i textu
 - Fronta (stage-list) se rozšiřuje s počtem položek až do 40vh místo fixních 130px
