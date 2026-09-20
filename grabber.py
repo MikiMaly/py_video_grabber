@@ -1,7 +1,9 @@
 import csv
 import json
+import os
 import queue
 import re
+import shutil
 import threading
 import time
 from dataclasses import dataclass
@@ -10,6 +12,8 @@ from pathlib import Path
 
 import yaml
 from yt_dlp import YoutubeDL
+
+import site_resolvers
 
 URL_FINDER = re.compile(r"https?://[^\s,;\"']+", re.IGNORECASE)
 INVALID_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -43,6 +47,26 @@ def load_config(path: str) -> dict:
     cfg.setdefault("retry_base_delay", 10)
     cfg.setdefault("state_file", "grabber_state.json")
     return cfg
+
+
+def resolve_ffmpeg(configured: str = "", *extra_dirs) -> str:
+    """Return a usable ffmpeg path, or "" to let yt-dlp find it on PATH.
+
+    A configured path that does not exist is ignored rather than handed to
+    yt-dlp — a config shipped with a macOS Homebrew path would otherwise break
+    every merge on Windows.
+    """
+    configured = (configured or "").strip()
+    if configured:
+        p = Path(configured).expanduser()
+        if p.is_file():
+            return str(p)
+    exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    for d in extra_dirs:
+        cand = Path(d) / exe
+        if cand.is_file():
+            return str(cand)
+    return shutil.which("ffmpeg") or ""
 
 
 def fmt_hhmmss(seconds: float) -> str:
@@ -399,24 +423,11 @@ class GrabberDaemon:
     # ── yt-dlp ──
 
     def _ffmpeg_available(self, ffmpeg_loc: str) -> bool:
-        import shutil
         if ffmpeg_loc:
             return Path(ffmpeg_loc).is_file()
         return shutil.which("ffmpeg") is not None
 
-    def _build_ydl_opts(self, job: Job) -> dict:
-        if job.title:
-            safe_title = sanitize_filename(job.title)
-            outtmpl = str(self.out_dir / f"{job.job_id}_{safe_title}.%(ext)s")
-        else:
-            outtmpl = str(self.out_dir / f"{job.job_id}_%(title)s.%(ext)s")
-
-        headers = {"User-Agent": self.cfg["user_agent"], "Referer": job.url}
-        ffmpeg_loc = (self.cfg.get("ffmpeg_path") or "").strip()
-        retries = int(self.cfg["retries"])
-        frag_cfg = self.cfg.get("fragment_retries")
-        fragment_retries = int(frag_cfg) if frag_cfg is not None else retries
-
+    def _make_progress_hook(self, job: "Job"):
         def hook(d):
             with self.lock:
                 j = self.jobs.get(job.job_id)
@@ -449,6 +460,21 @@ class GrabberDaemon:
                         j.final_path = str(Path(fn).resolve())
                 elif st == "error":
                     j.status = "fail"
+        return hook
+
+    def _build_ydl_opts(self, job: Job) -> dict:
+        if job.title:
+            safe_title = sanitize_filename(job.title)
+            outtmpl = str(self.out_dir / f"{job.job_id}_{safe_title}.%(ext)s")
+        else:
+            outtmpl = str(self.out_dir / f"{job.job_id}_%(title)s.%(ext)s")
+
+        headers = {"User-Agent": self.cfg["user_agent"], "Referer": job.url}
+        ffmpeg_loc = (self.cfg.get("ffmpeg_path") or "").strip()
+        retries = int(self.cfg["retries"])
+        frag_cfg = self.cfg.get("fragment_retries")
+        fragment_retries = int(frag_cfg) if frag_cfg is not None else retries
+        hook = self._make_progress_hook(job)
 
         if job.audio_only:
             if self._ffmpeg_available(ffmpeg_loc):
@@ -483,6 +509,34 @@ class GrabberDaemon:
         if ffmpeg_loc:
             opts["ffmpeg_location"] = ffmpeg_loc
         return opts
+
+    def _download_via_resolver(self, job: Job) -> bool:
+        """Fallback for pages yt-dlp can't extract (unsupported embed hosts).
+        Returns True if it produced a file, False if the resolver found nothing."""
+        resolved = site_resolvers.try_resolve_embed_chain(job.url)
+        if not resolved:
+            return False
+
+        title = job.title or resolved.title or job.job_id
+        safe_title = sanitize_filename(title)
+        ext = "mp3" if job.audio_only else "mp4"
+        dest = self.out_dir / f"{job.job_id}_{safe_title}.{ext}"
+        ffmpeg_loc = (self.cfg.get("ffmpeg_path") or "").strip()
+
+        site_resolvers.download_hls(
+            resolved,
+            dest,
+            ffmpeg_location=ffmpeg_loc,
+            progress_hook=self._make_progress_hook(job),
+            audio_only=job.audio_only,
+        )
+        with self.lock:
+            j = self.jobs.get(job.job_id)
+            if j and not j.title:
+                j.title = title
+            if j:
+                j.final_path = str(dest.resolve())
+        return True
 
     # ── worker threads ──
 
@@ -527,10 +581,15 @@ class GrabberDaemon:
                 }
                 if ffmpeg_loc:
                     opts["ffmpeg_location"] = ffmpeg_loc
-                with YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(job.url, download=False)
-                size_bytes = estimate_bytes_from_info(info)
-                title = info.get("title", "") if isinstance(info, dict) else ""
+                try:
+                    with YoutubeDL(opts) as ydl:
+                        info = ydl.extract_info(job.url, download=False)
+                    size_bytes = estimate_bytes_from_info(info)
+                    title = info.get("title", "") if isinstance(info, dict) else ""
+                except Exception:
+                    resolved = site_resolvers.try_resolve_embed_chain(job.url)
+                    size_bytes = 0
+                    title = resolved.title if resolved else ""
                 with self.lock:
                     j = self.jobs.get(job_id)
                     if j:
@@ -568,9 +627,13 @@ class GrabberDaemon:
                 time.sleep(0.1)
                 continue
             try:
-                opts = self._build_ydl_opts(job)
-                with YoutubeDL(opts) as ydl:
-                    ydl.extract_info(job.url, download=True)
+                try:
+                    opts = self._build_ydl_opts(job)
+                    with YoutubeDL(opts) as ydl:
+                        ydl.extract_info(job.url, download=True)
+                except Exception:
+                    if not self._download_via_resolver(job):
+                        raise
                 if not job.final_path:
                     matches = sorted(
                         self.out_dir.glob(job.job_id + "*"),

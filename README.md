@@ -11,9 +11,11 @@ Každý job má auto-retry s exponenciálním backoffem, metadata se prefetchuj�
 ## Spuštění
 
 ```bash
-pip install yt-dlp fastapi uvicorn pydantic PyYAML
+pip install yt-dlp fastapi uvicorn pydantic PyYAML "curl_cffi>=0.10,<0.15"
 python webapp.py
 ```
+
+`curl_cffi` je volitelný, ale doporučený — bez něj nefunguje fallback resolver pro stránky, které yt-dlp neumí extrahovat přímo (viz `site_resolvers.py`).
 
 Otevře se `http://localhost:8080`. Port a config lze změnit přes argumenty:
 
