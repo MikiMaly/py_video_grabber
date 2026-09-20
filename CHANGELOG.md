@@ -1,5 +1,16 @@
 # Changelog
 
+## v8.1 — exe konečně startuje
+- **Fallback resolver** pro stránky, které yt-dlp neumí extrahovat (iframe → `POST /dl` s `file_code` → HLS/mp4), s TLS impersonation přes `curl_cffi` — `site_resolvers.py`
+- **Fix:** zabalená aplikace padala hned po startu na `FileNotFoundError: config.yaml` — PyInstaller 6 dává data do `_internal/`, ale config se hledal vedle exe. Rozbité od v7.0, tzn. žádná dosavadní release nešla spustit
+- Config se při prvním spuštění zkopíruje vedle exe (zůstává editovatelný); state soubor a relativní `download_dir` jdou vedle aplikace, a když je umístění read-only (DMG, Program Files), tak do `~/UltimateVideoDownloader`
+- **Fix:** `ffmpeg_path` v configu byla macOS homebrew cesta, která na Windows rozbíjela slučování videa a zvuku — nově autodetekce (přibalený ffmpeg → PATH) a neexistující cesta se zahodí místo předání yt-dlp
+- **Fix:** resolver stahoval přímé mp4 zdroje, jako by šlo o HLS playlist (celé video do paměti, timeout po 30 s) — nově se streamuje po chunkách s průběžným progressem
+- `curl_cffi` se přibaluje do buildu — bez něj byl resolver v exe mrtvý kód, který mlčky nic neudělal
+- macOS build přibaluje `config.yaml` a `icon.ico`, aby binárka fungovala i samostatně
+- CI smoke test na Windows i macOS: build spadne, pokud se aplikace nerozjede a neodpoví na HTTP
+- `tkinter` se importuje až při otevření dialogu pro výběr složky (na macOS se nepoužívá vůbec)
+
 ## v8.0 — design refresh
 - Hero header: gradient title (`#22c55e → #14b8a6`), stat-karty s SVG ikonami a hover lift
 - Job tabulka → karty s barevným accent paskem, gradient progress barem + glow, pulse halo na downloading

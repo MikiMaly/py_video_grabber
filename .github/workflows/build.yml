@@ -20,7 +20,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install fastapi "uvicorn[standard]" yt-dlp pyyaml pyinstaller pyinstaller-hooks-contrib
+        run: pip install fastapi "uvicorn[standard]" yt-dlp pyyaml curl_cffi pyinstaller pyinstaller-hooks-contrib
 
       - name: Download FFmpeg
         shell: pwsh
@@ -40,6 +40,24 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path dist\UltimateVideoDownloader\* -DestinationPath UltimateVideoDownloader-win64.zip
 
+      - name: Smoke test EXE
+        shell: pwsh
+        run: |
+          $exe = "dist\UltimateVideoDownloader\UltimateVideoDownloader.exe"
+          $p = Start-Process $exe -ArgumentList "--no-browser","--port","8099" -PassThru -RedirectStandardOutput smoke.out -RedirectStandardError smoke.err
+          $ok = $false
+          foreach ($i in 1..20) {
+            Start-Sleep -Seconds 2
+            if ($p.HasExited) { break }
+            try {
+              Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8099/ -TimeoutSec 5 | Out-Null
+              $ok = $true; break
+            } catch {}
+          }
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          Get-Content smoke.out, smoke.err -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "App failed to serve http://127.0.0.1:8099/" }
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -57,14 +75,17 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install fastapi "uvicorn[standard]" yt-dlp pyyaml pyinstaller pyinstaller-hooks-contrib
+        run: pip install fastapi "uvicorn[standard]" yt-dlp pyyaml curl_cffi pyinstaller pyinstaller-hooks-contrib
 
       - name: Build app
         run: |
           pyinstaller --onefile \
             --name UltimateVideoDownloader \
             --icon icon.ico \
+            --add-data 'config.yaml:.' \
+            --add-data 'icon.ico:.' \
             --collect-all yt_dlp \
+            --collect-all curl_cffi \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.loops \
             --hidden-import uvicorn.loops.auto \
@@ -77,12 +98,27 @@ jobs:
             --hidden-import uvicorn.main \
             webapp.py
 
+      - name: Smoke test binary
+        run: |
+          cd dist
+          ./UltimateVideoDownloader --no-browser --port 8099 > smoke.log 2>&1 &
+          pid=$!
+          ok=0
+          for i in $(seq 1 20); do
+            sleep 2
+            kill -0 $pid 2>/dev/null || break
+            if curl -sf http://127.0.0.1:8099/ -o /dev/null; then ok=1; break; fi
+          done
+          kill $pid 2>/dev/null || true
+          cat smoke.log || true
+          [ $ok -eq 1 ] || { echo "App failed to serve http://127.0.0.1:8099/"; exit 1; }
+
       - name: Create DMG
         run: |
           mkdir -p dist/dmg_tmp
           cp dist/UltimateVideoDownloader dist/dmg_tmp/
           cp config.yaml dist/dmg_tmp/
-          printf 'Jak spustit:\n1. Otevri Terminal v teto slozce\n2. chmod +x UltimateVideoDownloader && ./UltimateVideoDownloader\n3. Prohlizec se otevri na http://localhost:8080\n' > dist/dmg_tmp/SPUSTENI.txt
+          printf 'Jak spustit:\n1. Zkopiruj obsah DMG do vlastni slozky (na DMG se zapisovat neda)\n2. Otevri Terminal v teto slozce\n3. chmod +x UltimateVideoDownloader && ./UltimateVideoDownloader\n4. Prohlizec se otevri na http://localhost:8080\n\nPro slucovani videa a zvuku je potreba ffmpeg: brew install ffmpeg\n' > dist/dmg_tmp/SPUSTENI.txt
           hdiutil create -volname UltimateVideoDownloader -srcfolder dist/dmg_tmp -ov -format UDZO UltimateVideoDownloader-macos.dmg
 
       - name: Upload artifact

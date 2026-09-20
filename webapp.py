@@ -3,25 +3,28 @@ import argparse
 import asyncio
 import os
 import sys
+import shutil
 import time
 import threading
 import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
-import tkinter as tk
-from tkinter import filedialog
 
 if getattr(sys, "frozen", False):
     _base = Path(sys._MEIPASS)          # type: ignore[attr-defined]
     _exe_dir = Path(sys.executable).parent
-    os.environ['PATH'] = str(_exe_dir) + os.pathsep + os.environ.get('PATH', '')
+    # PyInstaller >= 6 collects bundled binaries into _base (_internal/ for
+    # onedir builds), not next to the exe — put both on PATH so ffmpeg is found.
+    os.environ['PATH'] = os.pathsep.join(
+        [str(_base), str(_exe_dir), os.environ.get('PATH', '')]
+    )
 else:
     _base = Path(__file__).parent
     _exe_dir = Path(__file__).parent
 
 sys.path.insert(0, str(_base))
 
-from grabber import GrabberDaemon, load_config, fmt_hhmmss, fmt_size
+from grabber import GrabberDaemon, load_config, resolve_ffmpeg, fmt_hhmmss, fmt_size
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -1159,6 +1162,9 @@ async def browse_folder():
                 return r.stdout.strip().rstrip("/")
             return None
         else:
+            import tkinter as tk
+            from tkinter import filedialog
+
             root = tk.Tk()
             root.withdraw()
             root.wm_attributes("-topmost", True)
@@ -1244,6 +1250,46 @@ async def set_config(req: SetConfigReq):
 #  Entrypoint
 # ──────────────────────────────────────────────
 
+def _resolve_config(arg: str) -> Path:
+    """Locate config.yaml.
+
+    In a frozen build the bundled copy sits in _base, which the user cannot edit
+    (and which is a throwaway temp dir for onefile builds), so seed a copy next
+    to the executable on first run and use that from then on.
+    """
+    cfg_name = Path(arg).expanduser()
+    if cfg_name.is_absolute() or not getattr(sys, "frozen", False):
+        return cfg_name
+
+    user_cfg = _exe_dir / cfg_name
+    if user_cfg.is_file():
+        return user_cfg
+
+    bundled = _base / cfg_name
+    if bundled.is_file():
+        try:
+            shutil.copyfile(bundled, user_cfg)
+            return user_cfg
+        except OSError:
+            return bundled          # read-only location, e.g. a mounted DMG
+    return user_cfg
+
+
+def _data_dir(config_dir: Path) -> Path:
+    """Where the state file and relative download dirs live: next to the app if
+    that is writable, otherwise the user's home."""
+    base = _exe_dir if getattr(sys, "frozen", False) else config_dir
+    probe = base / ".uvd_write_test"
+    try:
+        probe.touch()
+        probe.unlink()
+        return base
+    except OSError:
+        fallback = Path.home() / "UltimateVideoDownloader"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+
 def main():
     global daemon
 
@@ -1253,12 +1299,20 @@ def main():
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
 
-    if getattr(sys, "frozen", False) and not Path(args.config).is_absolute():
-        args.config = str(_exe_dir / args.config)
+    cfg_path = _resolve_config(args.config)
+    cfg = load_config(str(cfg_path))
+    data_dir = _data_dir(cfg_path.resolve().parent)
 
-    cfg = load_config(args.config)
-    config_dir = Path(args.config).resolve().parent
-    state_path = (config_dir / cfg.get("state_file", "grabber_state.json")).resolve()
+    # bundled ffmpeg first, then PATH — a stale path from config is discarded
+    cfg["ffmpeg_path"] = resolve_ffmpeg(cfg.get("ffmpeg_path", ""), _base, _exe_dir)
+
+    dl_dir = Path(cfg["download_dir"]).expanduser()
+    cfg["download_dir"] = str(dl_dir if dl_dir.is_absolute() else data_dir / dl_dir)
+
+    state_path = Path(cfg.get("state_file", "grabber_state.json")).expanduser()
+    if not state_path.is_absolute():
+        state_path = data_dir / state_path
+    state_path = state_path.resolve()
 
     daemon = GrabberDaemon(cfg, state_path)
     daemon._load_state()
