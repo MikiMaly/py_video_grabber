@@ -227,9 +227,6 @@ HTML = r"""<!DOCTYPE html>
   .settings-actions { display: flex; align-items: center; gap: 16px; }
   #settings-toast { font-size: 13px; }
 
-  /* ── version badge ── */
-  .version-badge { font-size: 11px; color: var(--hub-text-faint); font-weight: 400; margin-left: 10px; }
-
   /* ── download app button ── */
   .dl-app-btn { font-size: 12px; color: var(--hub-aqua); border: 1px solid color-mix(in srgb, var(--hub-mint) 9%, transparent); border-radius: 6px;
                 padding: 4px 10px; text-decoration: none; white-space: nowrap; }
@@ -265,9 +262,6 @@ HTML = r"""<!DOCTYPE html>
               background: linear-gradient(135deg, var(--hub-green) 0%, var(--hub-aqua) 100%);
               -webkit-background-clip: text; background-clip: text; color: transparent;
               -webkit-text-fill-color: transparent; }
-  .version-badge { font-size: 11px; color: var(--hub-text-faint); font-weight: 500;
-                   padding: 2px 8px; background: color-mix(in srgb, var(--hub-mint) 3.6%, transparent);
-                   border: 1px solid color-mix(in srgb, var(--hub-mint) 7.2%, transparent); border-radius: 10px; }
 
   /* stat cards */
   .stat-cards { display: flex; gap: 10px; }
@@ -417,8 +411,6 @@ HTML = r"""<!DOCTYPE html>
   .brand h1 { font-family: var(--font-display); font-weight: 700; font-size: 23px; letter-spacing: -0.03em;
               background: var(--hub-aurora); -webkit-background-clip: text; background-clip: text; }
   .brand h1 .dot { color: var(--hub-raspberry); -webkit-text-fill-color: var(--hub-raspberry); }
-  .version-badge { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--hub-text-dim);
-                   background: var(--hub-ink-3); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
 
   /* štítky a popisky: mono, uppercase */
   .stat-lbl, .stat-card .stat-cap, .settings-section-title, .job-status-pill, .job-id {
@@ -501,7 +493,6 @@ HTML = r"""<!DOCTYPE html>
   <div class="brand">
     <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSI0IiB5MT0iMjgiIHgyPSIyOCIgeTI9IjQiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMyMmM1NWUiLz48c3RvcCBvZmZzZXQ9IjAuNTUiIHN0b3AtY29sb3I9IiMzZWUwYzMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM5ZWYwY2MiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB4PSIwLjc1IiB5PSIwLjc1IiB3aWR0aD0iMzAuNSIgaGVpZ2h0PSIzMC41IiByeD0iOSIgZmlsbD0iIzBjMTcxNSIgc3Ryb2tlPSJ1cmwoI2EpIiBzdHJva2Utb3BhY2l0eT0iMC41NSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48cGF0aCBkPSJNNy41IDIyLjVWMTMuNWEzLjc1IDMuNzUgMCAwIDEgNy41IDB2OU0xNSAxMy41YTMuNzUgMy43NSAwIDAgMSA3LjUgMHY5IiBzdHJva2U9InVybCgjYSkiIHN0cm9rZS13aWR0aD0iMi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSIyNi4yNSIgY3k9IjIyLjI1IiByPSIxLjkiIGZpbGw9IiNlODMzNmYiLz48L3N2Zz4=" alt="">
     <h1>Ultimate Video Downloader<span class="dot">.</span></h1>
-    <span class="version-badge">v9.0 &middot; skleník</span>
   </div>
   <span id="shutdown-banner">&#9888; Shutting down&hellip;</span>
   <div class="stat-cards">
