@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <!-- Logo mmaly.cz (identita 2.0 "Skleník"), převzaté z hubu: public/favicon.svg.
+       Hex kódy = paleta hubu (hub-green, hub-aqua, hub-mint, hub-raspberry, hub-ink-2).
+       Z tohohle souboru se generují icon.png, icon.ico a icons/ (scripts/make_icons.py). -->
+  <defs>
+    <linearGradient id="a" x1="4" y1="28" x2="28" y2="4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="0.55" stop-color="#3ee0c3"/>
+      <stop offset="1" stop-color="#9ef0cc"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.75" y="0.75" width="30.5" height="30.5" rx="9" fill="#0c1715" stroke="url(#a)" stroke-opacity="0.55" stroke-width="1.5"/>
+  <path d="M7.5 22.5V13.5a3.75 3.75 0 0 1 7.5 0v9M15 13.5a3.75 3.75 0 0 1 7.5 0v9" stroke="url(#a)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="26.25" cy="22.25" r="1.9" fill="#e8336f"/>
+</svg>

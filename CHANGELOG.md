@@ -1,5 +1,12 @@
 # Changelog
 
+## v9.0 — Skleník
+- Design sjednocený s hubem mmaly.cz 2.0 (identita „Skleník"): paleta hubu jako CSS proměnné `--hub-*` (hex kódy jen na jednom místě), tmavé zelené sklo místo modročerné
+- Stavy podle hubu: stahuje = akvamarín, čeká / ve frontě = meruňka, hotovo = zelená, chyba / rušení = malina (dřív modrá, oranžová, červená)
+- Písma Space Grotesk (nadpisy, čísla), Inter (text), JetBrains Mono (štítky); název v aurora přechodu s malinovou tečkou
+- Skleněné pozadí (mřížka 56 px + záře), matné karty s akvamarínovou hranou při hoveru, tlačítka a inputy podle `.hub-btn-*` / `.hub-input`
+- **Ikona aplikace = logo mmaly.cz** (`icon.svg`); `icon.png`, `icon.ico` i `icons/` se generují skriptem `scripts/make_icons.py`
+
 ## v8.1 — exe konečně startuje
 - **Fallback resolver** pro stránky, které yt-dlp neumí extrahovat (iframe → `POST /dl` s `file_code` → HLS/mp4), s TLS impersonation přes `curl_cffi` — `site_resolvers.py`
 - **Fix:** zabalená aplikace padala hned po startu na `FileNotFoundError: config.yaml` — PyInstaller 6 dává data do `_internal/`, ale config se hledal vedle exe. Rozbité od v7.0, tzn. žádná dosavadní release nešla spustit
