@@ -1,11 +1,15 @@
 # Changelog
 
-## v9.0 — Skleník
+## v9.0 — Skleník + rozšíření do prohlížeče
 - Design sjednocený s hubem mmaly.cz 2.0 (identita „Skleník"): paleta hubu jako CSS proměnné `--hub-*` (hex kódy jen na jednom místě), tmavé zelené sklo místo modročerné
 - Stavy podle hubu: stahuje = akvamarín, čeká / ve frontě = meruňka, hotovo = zelená, chyba / rušení = malina (dřív modrá, oranžová, červená)
 - Písma Space Grotesk (nadpisy, čísla), Inter (text), JetBrains Mono (štítky); název v aurora přechodu s malinovou tečkou
 - Skleněné pozadí (mřížka 56 px + záře), matné karty s akvamarínovou hranou při hoveru, tlačítka a inputy podle `.hub-btn-*` / `.hub-input`
 - **Ikona aplikace = logo mmaly.cz** (`icon.svg`); `icon.png`, `icon.ico` i `icons/` se generují skriptem `scripts/make_icons.py`
+- **Rozšíření pro Chrome / Edge / Brave / Firefox** (`browser_extension/`): pravé tlačítko na odkaz nebo stránku → *Přidat do fronty* / *Stáhnout jako další (nahoru)* / *Přidat jako MP3*, potvrzení systémovou notifikací, klik na ikonu otevře UI. Adresa grabberu je nastavitelná v možnostech rozšíření
+- `/api/add_bulk` umí `top: true` — job dostane prioritu nad vším, co čeká; duplicitní URL, která už čeká ve frontě, se místo přeskočení posune nahoru (`moved` v odpovědi)
+- **Bezpečnost:** server nově poslouchá jen na `127.0.0.1` místo `0.0.0.0` — API je bez přihlášení, takže dřív mohl frontu ovládat kdokoliv v místní síti. Původní chování přes `--host 0.0.0.0`
+- Rozšíření je přibalené v release ZIPu i DMG
 
 ## v8.1 — exe konečně startuje
 - **Fallback resolver** pro stránky, které yt-dlp neumí extrahovat (iframe → `POST /dl` s `file_code` → HLS/mp4), s TLS impersonation přes `curl_cffi` — `site_resolvers.py`

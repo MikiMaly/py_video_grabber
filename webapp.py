@@ -1225,6 +1225,7 @@ async def get_state():
 class BulkReq(BaseModel):
     urls: list[str]
     audio_only: bool = False
+    top: bool = False
 
 class PrioReq(BaseModel):
     jid: int
@@ -1254,7 +1255,7 @@ class SetConfigReq(BaseModel):
 
 @app.post("/api/add_bulk")
 async def add_bulk(req: BulkReq):
-    return daemon.add_bulk(req.urls, audio_only=req.audio_only)
+    return daemon.add_bulk(req.urls, audio_only=req.audio_only, top=req.top)
 
 
 @app.post("/api/priority")
@@ -1435,6 +1436,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--port",   type=int, default=8080)
+    # localhost only by default — the API has no auth; use 0.0.0.0 only on a trusted network
+    ap.add_argument("--host",   default="127.0.0.1")
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
 
@@ -1461,7 +1464,7 @@ def main():
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{args.port}")).start()
 
     print(f"Ultimate Video Downloader -> http://localhost:{args.port}")
-    uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":

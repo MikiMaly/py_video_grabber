@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Video Grabber",
+  "version": "1.0",
+  "description": "Pravým tlačítkem pošle odkaz do fronty Ultimate Video Downloaderu.",
+  "icons": {
+    "16": "icons/icon_16.png",
+    "32": "icons/icon_32.png",
+    "48": "icons/icon_48.png",
+    "128": "icons/icon_128.png"
+  },
+  "action": {
+    "default_title": "Otevřít Video Grabber",
+    "default_icon": {
+      "16": "icons/icon_16.png",
+      "32": "icons/icon_32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "permissions": ["contextMenus", "notifications", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "video-grabber@mmaly.cz",
+      "strict_min_version": "121.0"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vygeneruje icon.png, icon.ico a icons/icon_*.png z icon.svg (logo hubu mmaly.cz).
+"""Vygeneruje icon.png, icon.ico, icons/icon_*.png a ikony rozšíření z icon.svg (logo mmaly.cz).
 
     pip install cairosvg pillow
     python scripts/make_icons.py
@@ -25,6 +25,8 @@ def main():
     for s, img in images.items():
         img.save(ROOT / "icons" / f"icon_{s}.png", optimize=True)
     images[512].save(ROOT / "icon.png", optimize=True)
+    for s in (16, 32, 48, 128):
+        images[s].save(ROOT / "browser_extension" / "icons" / f"icon_{s}.png", optimize=True)
     # .ico: každá velikost vyrenderovaná zvlášť, ať jsou malé ikony ostré
     images[256].save(ROOT / "icon.ico", sizes=[(s, s) for s in SIZES if s <= 256],
                      append_images=[images[s] for s in SIZES if s < 256])

@@ -38,7 +38,9 @@ jobs:
 
       - name: Create ZIP
         shell: pwsh
-        run: Compress-Archive -Path dist\UltimateVideoDownloader\* -DestinationPath UltimateVideoDownloader-win64.zip
+        run: |
+          Copy-Item -Recurse browser_extension dist\UltimateVideoDownloader\
+          Compress-Archive -Path dist\UltimateVideoDownloader\* -DestinationPath UltimateVideoDownloader-win64.zip
 
       - name: Smoke test EXE
         shell: pwsh
@@ -118,6 +120,7 @@ jobs:
           mkdir -p dist/dmg_tmp
           cp dist/UltimateVideoDownloader dist/dmg_tmp/
           cp config.yaml dist/dmg_tmp/
+          cp -R browser_extension dist/dmg_tmp/
           printf 'Jak spustit:\n1. Zkopiruj obsah DMG do vlastni slozky (na DMG se zapisovat neda)\n2. Otevri Terminal v teto slozce\n3. chmod +x UltimateVideoDownloader && ./UltimateVideoDownloader\n4. Prohlizec se otevri na http://localhost:8080\n\nPro slucovani videa a zvuku je potreba ffmpeg: brew install ffmpeg\n' > dist/dmg_tmp/SPUSTENI.txt
           hdiutil create -volname UltimateVideoDownloader -srcfolder dist/dmg_tmp -ov -format UDZO UltimateVideoDownloader-macos.dmg
 
