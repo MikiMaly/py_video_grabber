@@ -1,5 +1,11 @@
 # Changelog
 
+## v8.2 — rozšíření do prohlížeče
+- **Rozšíření pro Chrome / Edge / Brave / Firefox** (`browser_extension/`): pravé tlačítko na odkaz nebo stránku → *Přidat do fronty* / *Stáhnout jako další (nahoru)* / *Přidat jako MP3*, potvrzení systémovou notifikací, klik na ikonu otevře UI. Adresa grabberu je nastavitelná v možnostech rozšíření
+- `/api/add_bulk` umí `top: true` — job dostane prioritu nad vším, co čeká; duplicitní URL, která už čeká ve frontě, se místo přeskočení posune nahoru (`moved` v odpovědi)
+- **Bezpečnost:** server nově poslouchá jen na `127.0.0.1` místo `0.0.0.0` — API je bez přihlášení, takže dřív mohl frontu ovládat kdokoliv v místní síti. Původní chování přes `--host 0.0.0.0`
+- Rozšíření je přibalené v release ZIPu i DMG
+
 ## v8.1 — exe konečně startuje
 - **Fallback resolver** pro stránky, které yt-dlp neumí extrahovat (iframe → `POST /dl` s `file_code` → HLS/mp4), s TLS impersonation přes `curl_cffi` — `site_resolvers.py`
 - **Fix:** zabalená aplikace padala hned po startu na `FileNotFoundError: config.yaml` — PyInstaller 6 dává data do `_internal/`, ale config se hledal vedle exe. Rozbité od v7.0, tzn. žádná dosavadní release nešla spustit

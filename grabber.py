@@ -254,16 +254,36 @@ class GrabberDaemon:
             self._enqueue_locked(job_id)
         return job_id
 
-    def add_bulk(self, urls: list[str], audio_only: bool = False) -> dict:
+    def add_bulk(self, urls: list[str], audio_only: bool = False, top: bool = False) -> dict:
+        """top=True puts the URLs ahead of everything waiting (still behind running downloads)."""
+        priority = 0
+        if top:
+            with self.lock:
+                priority = max(
+                    (j.priority for j in self.jobs.values() if j.status in ("pending", "queued")),
+                    default=0,
+                ) + 1
         added = 0
+        moved = 0
         skipped = 0
         for u in urls:
             try:
-                self.add_url(u.strip(), audio_only=audio_only)
+                self.add_url(u.strip(), priority=priority, audio_only=audio_only)
                 added += 1
-            except ValueError:
-                skipped += 1
-        return {"added": added, "skipped": skipped, "total": len(urls)}
+            except ValueError as e:
+                if top and str(e) == "duplicate" and self._raise_priority(u.strip(), priority):
+                    moved += 1
+                else:
+                    skipped += 1
+        return {"added": added, "moved": moved, "skipped": skipped, "total": len(urls)}
+
+    def _raise_priority(self, url: str, priority: int) -> bool:
+        with self.lock:
+            for j in self.jobs.values():
+                if j.url == url and j.status in ("pending", "queued"):
+                    j.priority = max(j.priority, priority)
+                    return True
+        return False
 
     def bump_priority(self, jid: int) -> str:
         with self.lock:

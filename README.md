@@ -23,6 +23,24 @@ Otevře se `http://localhost:8080`. Port a config lze změnit přes argumenty:
 python webapp.py --port 9000 --config config.yaml
 ```
 
+Server poslouchá jen na `127.0.0.1` (API nemá přihlášení). Přístup z jiných zařízení v síti povolíš přes `--host 0.0.0.0` — jen v důvěryhodné síti.
+
+## Rozšíření do prohlížeče (pravé tlačítko → stáhnout)
+
+Ve složce [`browser_extension/`](browser_extension) je rozšíření pro Chrome, Edge, Brave i Firefox. Na odkazu (nebo kdekoliv na stránce s videem) dáš pravé tlačítko → **Video Grabber** a vybereš:
+
+- **Přidat do fronty** — zařadí se na konec
+- **Stáhnout jako další (nahoru)** — přeskočí čekající videa; běžící stahování se nepřeruší. Když už odkaz ve frontě je, jen se posune nahoru
+- **Přidat jako MP3** — stáhne jen zvuk
+
+Klik na ikonu rozšíření v liště otevře UI grabberu. Grabber musí běžet (klidně s `--no-browser` na pozadí).
+
+**Instalace (Chrome / Edge / Brave):** `chrome://extensions` (v Edge `edge://extensions`) → zapnout *Režim pro vývojáře* → *Načíst rozbalené* → vybrat složku `browser_extension`.
+
+**Instalace (Firefox):** `about:debugging#/runtime/this-firefox` → *Načíst dočasný doplněk* → vybrat `browser_extension/manifest.json`. Dočasný doplněk vydrží jen do restartu Firefoxu; trvalá instalace vyžaduje podepsání přes addons.mozilla.org.
+
+Pokud grabber běží na jiném portu, adresa se mění v nastavení rozšíření (pravý klik na ikonu → *Možnosti*).
+
 ## Co umí
 
 - Webové UI — fronta, progress bary, ETA, rychlost

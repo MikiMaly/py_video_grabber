@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 16px; min-width: 340px; }
+  label { display: block; margin-bottom: 6px; font-weight: 600; }
+  input { width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit; }
+  .row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .hint { color: #666; font-size: 12px; margin-top: 6px; }
+  #status { font-size: 12px; }
+</style>
+</head>
+<body>
+  <label for="server">Adresa grabberu</label>
+  <input id="server" type="url" placeholder="http://127.0.0.1:8080">
+  <div class="hint">Výchozí je grabber na tomhle počítači. Port změň, pokud spouštíš s <code>--port</code>.</div>
+  <div class="row">
+    <button id="save">Uložit</button>
+    <button id="test">Vyzkoušet spojení</button>
+    <span id="status"></span>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>
