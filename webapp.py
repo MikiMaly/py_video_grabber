@@ -1430,6 +1430,35 @@ def _data_dir(config_dir: Path) -> Path:
         return fallback
 
 
+def _own_console_window(port: int) -> None:
+    if sys.platform != "win32":
+        return
+    import ctypes
+    import subprocess
+    from ctypes import wintypes
+
+    k32, u32 = ctypes.WinDLL("kernel32"), ctypes.WinDLL("user32")
+    k32.GetConsoleWindow.restype = wintypes.HWND
+    u32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+
+    hwnd = k32.GetConsoleWindow()
+    if not hwnd:
+        return
+
+    cls = ctypes.create_unicode_buffer(64)
+    u32.GetClassNameW(hwnd, cls, 64)
+    launched_alone = k32.GetConsoleProcessList((wintypes.DWORD * 2)(), 2) == 1
+    # under Windows Terminal (Win11 default) the taskbar shows Terminal's icon; a classic console shows the exe's own
+    if cls.value == "PseudoConsoleWindow" and launched_alone and not os.environ.get("UVD_CONHOST"):
+        conhost = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "conhost.exe"
+        if conhost.exists():
+            argv = [sys.executable] + (sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv)
+            subprocess.Popen([str(conhost), *argv], env={**os.environ, "UVD_CONHOST": "1"})
+            sys.exit(0)
+
+    k32.SetConsoleTitleW(f"Ultimate Video Downloader · server :{port}")
+
+
 def main():
     global daemon
 
@@ -1440,6 +1469,7 @@ def main():
     ap.add_argument("--host",   default="127.0.0.1")
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
+    _own_console_window(args.port)
 
     cfg_path = _resolve_config(args.config)
     cfg = load_config(str(cfg_path))

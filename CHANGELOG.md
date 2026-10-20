@@ -1,5 +1,10 @@
 # Changelog
 
+## v9.1 — server zase ve vlastním okně
+- **Fix:** na Windows 11 se aplikace po dvojkliku otevírala ve Windows Terminalu (výchozí terminál), takže na liště byla ikona Terminálu a běžící server nešel poznat. Instance spuštěná dvojklikem se teď sama přesune do klasického konzolového okna (`conhost`) → na liště je zase ikona aplikace
+- Titulek okna `Ultimate Video Downloader · server :8080` (s portem)
+- Spuštění ručně z už otevřeného terminálu zůstává v něm, přesun se týká jen samostatného spuštění
+
 ## v9.0 — Skleník + rozšíření do prohlížeče
 - Design sjednocený s hubem mmaly.cz 2.0 (identita „Skleník"): paleta hubu jako CSS proměnné `--hub-*` (hex kódy jen na jednom místě), tmavé zelené sklo místo modročerné
 - Stavy podle hubu: stahuje = akvamarín, čeká / ve frontě = meruňka, hotovo = zelená, chyba / rušení = malina (dřív modrá, oranžová, červená)
