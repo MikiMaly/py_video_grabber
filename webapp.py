@@ -1448,8 +1448,10 @@ def _own_console_window(port: int) -> None:
     cls = ctypes.create_unicode_buffer(64)
     u32.GetClassNameW(hwnd, cls, 64)
     launched_alone = k32.GetConsoleProcessList((wintypes.DWORD * 2)(), 2) == 1
+    interactive = sys.stdout is not None and sys.stdout.isatty()
     # under Windows Terminal (Win11 default) the taskbar shows Terminal's icon; a classic console shows the exe's own
-    if cls.value == "PseudoConsoleWindow" and launched_alone and not os.environ.get("UVD_CONHOST"):
+    if (cls.value == "PseudoConsoleWindow" and launched_alone and interactive
+            and not os.environ.get("UVD_CONHOST")):
         conhost = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "conhost.exe"
         if conhost.exists():
             argv = [sys.executable] + (sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv)
