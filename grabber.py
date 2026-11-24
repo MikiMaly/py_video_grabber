@@ -17,6 +17,22 @@ import site_resolvers
 
 URL_FINDER = re.compile(r"https?://[^\s,;\"']+", re.IGNORECASE)
 INVALID_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+class _QuietLogger:
+    """yt-dlp prints errors to stderr even with quiet=True. The daemon records
+    them on the job anyway, and for pages the fallback resolver handles they are
+    not errors at all, so keep them off the console."""
+
+    def debug(self, msg):
+        pass
+
+    info = warning = error = debug
+
+
+def _console(tag: str, text: str) -> None:
+    print(f"[{tag}] {ANSI_RE.sub('', text)}", flush=True)
 
 
 def sanitize_filename(name: str, max_len: int = 80) -> str:
@@ -201,6 +217,9 @@ class GrabberDaemon:
 
         self._state_path = state_path
         self._shutting_down: bool = False
+
+        # bytes of finished downloads since this run started (UI "staženo" counter)
+        self.session_bytes: int = 0
 
     # ── internal helpers ──
 
@@ -518,6 +537,7 @@ class GrabberDaemon:
             "quiet": True,
             "no_warnings": True,
             "noprogress": True,
+            "logger": _QuietLogger(),
             "http_headers": headers,
             "progress_hooks": [hook],
         }
@@ -594,6 +614,7 @@ class GrabberDaemon:
                     "quiet": True,
                     "no_warnings": True,
                     "noprogress": True,
+                    "logger": _QuietLogger(),
                     "skip_download": True,
                     "http_headers": headers,
                     "socket_timeout": int(self.cfg["timeout_sec"]),
@@ -646,6 +667,7 @@ class GrabberDaemon:
             if not job:
                 time.sleep(0.1)
                 continue
+            _console("stahuji", f"#{job.jid} {job.title or job.url}")
             try:
                 try:
                     opts = self._build_ydl_opts(job)
@@ -665,9 +687,17 @@ class GrabberDaemon:
                 mp4 = self.out_dir / f"{job.job_id}.mp4"
                 if mp4.exists():
                     job.final_path = str(mp4.resolve())
+                try:
+                    size = Path(job.final_path).stat().st_size if job.final_path else 0
+                except OSError:
+                    size = 0
                 with self.lock:
                     job.status = "done"
                     job.finished_at = time.time()
+                    if size:
+                        job.total = size
+                    self.session_bytes += size or job.total
+                _console("hotovo", f"#{job.jid} {job.final_path or job.title or job.url}")
             except Exception as e:
                 with self.lock:
                     if job.retry_count < self.max_retries:
@@ -682,10 +712,13 @@ class GrabberDaemon:
                         job.eta_bad = False
                         job.last_eta_check_at = 0.0
                         self.pending.append(job_id)
+                        tag = f"znovu {job.retry_count}/{self.max_retries} za {delay:.0f}s"
                     else:
                         job.status = "fail"
                         job.finished_at = time.time()
                         job.error = str(e)
+                        tag = "chyba"
+                _console(tag, f"#{job.jid} {job.url}: {e}")
         with self._worker_lock:
             self._running_workers -= 1
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## v9.4 — kompaktní seznam, počítadlo staženého, oprava resolveru
+- **Fix resolveru:** přehrávače s více servery, které mají embedy jako JSON uvnitř `<iframe srcdoc>`, se zase rozpoznají — fallback teď kromě `<iframe src>` zkouší i tyhle embedy (bez duplicit)
+- Kompaktní jednořádkové karty úloh: stav, číslo, název + URL a údaje o stahování na jednom řádku, průběh jako tenká linka přes celou šířku dole → na obrazovku se vejde mnohem víc úloh. Na úzkém okně se údaje zalomí pod název
+- Seznam úloh už nebliká: karty se při obnovování neskládají znovu (každou vteřinu se dřív přehrávala animace a resetoval progress bar), mění se jen to, co se opravdu změnilo
+- Nová dlaždice **staženo** v hlavičce: kolik se od spuštění aplikace stáhlo (dokončené soubory + co už mají na disku běžící stahování)
+- Konzole serveru: řádky `[stahuji]`, `[hotovo]`, `[znovu n/m]` a `[chyba]` u každé úlohy; chybové hlášky yt-dlp, které řeší fallback resolver, už konzoli nezaplavují
+- Složka vybraná přes dialog (tlačítko se složkou) se teď taky zapamatuje do `settings.json`
+- „Jen audio" zmizelo z hlavní obrazovky — nastavuje se formátem v Nastavení
+
 ## v9.3 — sloty přímo z lišty + aplikace si pamatuje nastavení
 - **Nastavení přežije restart:** co změníš v UI (sloty, formát, složka, retry, …), se uloží do `settings.json` vedle aplikace a při startu přebije `config.yaml`. Dřív se po restartu všechno vrátilo na hodnoty z `config.yaml`. Ukládají se jen opravdu změněné hodnoty, takže autodetekce ffmpeg zůstává. Návrat k výchozímu = smazat `settings.json`
 - Tlačítka **− / +** u počtu slotů v horní liště: počet paralelních stahování (1–16) jde měnit bez otevírání Nastavení. Přidání slotu hned rozběhne další stahování z fronty, ubrání nechá běžící stahování doběhnout

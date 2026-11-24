@@ -10,6 +10,7 @@ blocked the same way plain urllib does).
 
 Only engaged as a fallback when yt-dlp itself fails to extract a URL.
 """
+import html
 import re
 import tempfile
 from dataclasses import dataclass, field
@@ -22,6 +23,8 @@ except ImportError:
     cf_requests = None
 
 IFRAME_RE = re.compile(r'<iframe[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+# multi-server players list their embeds as JSON inside an <iframe srcdoc>
+EMBED_URL_RE = re.compile(r'"embedUrl"\s*:\s*"([^"]+)"')
 FILE_CODE_FIELD_RE = re.compile(r'name=["\']file_code["\']\s+value=["\']([^"\']*)["\']', re.IGNORECASE)
 SOURCE_M3U8_RE = re.compile(r'file\s*:\s*"([^"]+\.m3u8[^"]*)"')
 SOURCE_MP4_RE = re.compile(r'file\s*:\s*"([^"]+\.mp4[^"]*)"')
@@ -68,8 +71,9 @@ def try_resolve_embed_chain(url: str, timeout: int = 20) -> "ResolvedStream | No
     if m:
         title = m.group(1).strip()
 
-    for iframe_src in IFRAME_RE.findall(page_html):
-        embed_url = urljoin(url, iframe_src)
+    candidates = IFRAME_RE.findall(page_html) + EMBED_URL_RE.findall(html.unescape(page_html))
+    for embed_src in dict.fromkeys(candidates):
+        embed_url = urljoin(url, embed_src)
         resolved = _try_resolve_embed_url(embed_url, referer=url, timeout=timeout)
         if resolved:
             if title and not resolved.title:

@@ -281,6 +281,8 @@ HTML = r"""<!DOCTYPE html>
   .stat-card.s-queue  .stat-num { color: var(--hub-apricot); }
   .stat-card.s-done   .stat-num { color: var(--hub-green); }
   .stat-card.s-fail   .stat-num { color: var(--hub-raspberry); }
+  .stat-card.s-bytes  .stat-num { color: var(--hub-mint); font-variant-numeric: tabular-nums; }
+  .stat-card.s-bytes:hover  { border-color: color-mix(in srgb, var(--hub-mint) 40%, transparent);  box-shadow: 0 6px 20px color-mix(in srgb, var(--hub-mint) 8%, transparent); }
 
   /* job cards */
   .job-list { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
@@ -494,6 +496,51 @@ HTML = r"""<!DOCTYPE html>
               border: 1px solid var(--border); border-radius: 7px; transition: background-color .15s, color .15s, border-color .15s; }
   .step-btn:hover:not(:disabled) { color: var(--hub-mint); background: var(--hub-ink-4); border-color: var(--border-strong); }
   .step-btn:disabled { opacity: 0.35; cursor: default; }
+
+  /* ════════════════════════════════════════════════════════════
+     ── v9.4 kompaktní řádky ── víc úloh na obrazovku, info po celé šířce
+     ════════════════════════════════════════════════════════════ */
+  header { padding: 8px 20px; gap: 14px; }
+  .brand .logo { width: 26px; height: 26px; }
+  .brand h1 { font-size: 18px; }
+  .stat-card { padding: 6px 26px 6px 10px; min-width: 70px; border-radius: 10px; }
+  .stat-card .stat-num { font-size: 17px; }
+  .stat-card .stat-cap { margin-top: 2px; }
+  .stat-card .stat-icon { top: 6px; right: 7px; }
+  .stat-card:hover { transform: none; }
+  .stage-input-row { padding: 10px 20px; }
+  .stage-input-row input { padding: 10px 14px; font-size: 15px; border-radius: 10px; }
+  .staged-empty { padding: 4px 20px; }
+  .stage-footer { padding: 6px 20px; }
+
+  .job-list { padding: 8px 14px; gap: 4px; }
+  .job-card { display: grid; grid-template-columns: 104px 46px minmax(0, 1fr) auto auto;
+              align-items: center; column-gap: 12px; padding: 6px 12px 6px 14px; border-radius: 9px; }
+  .job-card:hover { transform: none; }
+  .job-card::before { width: 3px; }
+  .job-status-pill { padding: 2px 8px; font-size: 10px; justify-self: start; }
+  .job-main { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .job-main .job-title { flex: 0 1 auto; min-width: 0; margin: 0; font-size: 13px; }
+  .job-main .job-url { flex: 1 1 0; min-width: 60px; }
+  .job-card .job-meta-row { margin: 0; flex-wrap: nowrap; white-space: nowrap; justify-content: flex-end;
+                            gap: 12px; font-size: 12px; max-width: 46vw; overflow: hidden; }
+  .job-meta-row .pct  { min-width: 46px; text-align: right; }
+  .job-meta-row .size { min-width: 112px; text-align: right; }
+  .job-meta-row .spd  { min-width: 74px; text-align: right; }
+  .job-meta-row .err  { overflow: hidden; text-overflow: ellipsis; color: var(--hub-raspberry); }
+  .job-actions { margin: 0; flex-wrap: nowrap; }
+  .job-actions:empty { display: none; }
+  /* progress = tenká linka přes celou šířku dole */
+  .job-card .bar-bg { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; margin: 0;
+                      border-radius: 0; background: color-mix(in srgb, var(--hub-mint) 5%, transparent); }
+  .job-card .bar-fill { height: 3px; border-radius: 0; }
+
+  @media (max-width: 820px) {
+    .job-card { grid-template-columns: auto auto minmax(0, 1fr) auto; row-gap: 3px; }
+    .job-card .job-meta-row { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; max-width: none; }
+    .job-card .job-actions { grid-column: 4; grid-row: 1; }
+    .job-meta-row .pct, .job-meta-row .size, .job-meta-row .spd { min-width: 0; text-align: left; }
+  }
 </style>
 </head>
 <body>
@@ -524,6 +571,11 @@ HTML = r"""<!DOCTYPE html>
       <svg class="icon stat-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       <div class="stat-num" id="s-fail">0</div>
       <div class="stat-cap">selhalo</div>
+    </div>
+    <div class="stat-card s-bytes" title="Celkem stažený objem od spuštění aplikace">
+      <svg class="icon stat-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      <div class="stat-num" id="s-bytes">0 GB</div>
+      <div class="stat-cap">staženo</div>
     </div>
   </div>
 </header>
@@ -565,7 +617,8 @@ HTML = r"""<!DOCTYPE html>
     </div>
     <div class="stage-footer">
       <button class="btn" id="btn-dl-all" onclick="downloadAll()" disabled>&#9654; Sta&#382;en&#237; (0)</button>
-      <label class="audio-chk-label" id="audio-chk-label" title="Sta&#382;en&#237; jen zvuku (MP3 / M4A)">
+      <!-- jen audio se nastavuje formátem v Nastavení; skrytý checkbox drží stav pro add_bulk -->
+      <label class="audio-chk-label" id="audio-chk-label" style="display:none">
         <input type="checkbox" id="audio-only-chk" onchange="toggleAudioOnly()"> Jen audio
       </label>
       <button class="btn btn-danger" id="btn-clear" onclick="clearStaging()" style="display:none">&#10005; Zru&#353;it v&#353;e</button>
@@ -958,27 +1011,23 @@ function renderJob(j) {
   const audioBadge = j.audio_only ? '<span class="audio-badge">MP3</span>' : '';
   const title = j.title || '';
   const titleHtml = title
-    ? '<div class="job-title">'+esc(title)+audioBadge+'</div><div class="job-url">'+esc(j.url)+'</div>'
-    : '<div class="job-title" style="color:var(--hub-text-dim)">'+esc(j.url)+audioBadge+'</div>';
+    ? '<span class="job-title">'+esc(title)+audioBadge+'</span><span class="job-url">'+esc(j.url)+'</span>'
+    : '<span class="job-title" style="color:var(--hub-text-dim)">'+esc(j.url)+audioBadge+'</span>';
 
-  let progHtml = '', actHtml = '';
+  let metaHtml = '', actHtml = '', barHtml = '';
 
   if (j.status === 'downloading') {
     const pct = j.progress_pct || 0;
-    progHtml =
-      '<div class="job-progress">' +
-        '<div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%"></div></div>' +
-        '<div class="job-meta-row">' +
-          '<span class="pct">'+pct.toFixed(1)+'%</span>' +
-          '<span>'+fmtSize(j.downloaded)+' / '+j.total_str+'</span>' +
-          '<span class="spd">'+j.speed_str+'</span>' +
-          '<span class="elap">⏱ '+j.elapsed_str+'</span>' +
-          (j.eta_str ? '<span class="eta'+(j.eta_bad?' bad':'')+'">ETA '+j.eta_str+'</span>' : '') +
-        '</div>' +
-      '</div>';
+    barHtml = '<div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%"></div></div>';
+    metaHtml =
+      '<span class="pct">'+pct.toFixed(1)+'%</span>' +
+      '<span class="size">'+fmtSize(j.downloaded)+' / '+j.total_str+'</span>' +
+      '<span class="spd">'+j.speed_str+'</span>' +
+      '<span class="elap">⏱ '+j.elapsed_str+'</span>' +
+      (j.eta_str ? '<span class="eta'+(j.eta_bad?' bad':'')+'">ETA '+j.eta_str+'</span>' : '');
 
   } else if (j.status === 'queued') {
-    progHtml = '<div class="job-meta-row"><span class="dim">Ve frontě od '+j.enqueued_at+'</span></div>';
+    metaHtml = '<span class="dim">Ve frontě od '+j.enqueued_at+'</span>';
     actHtml  = iconBtn('prio', j.jid) + iconBtn('cancel', j.jid);
 
   } else if (j.status === 'pending') {
@@ -991,33 +1040,27 @@ function renderJob(j) {
     } else if (j.priority > 0) {
       badge = '<span class="prio-tag">prio +'+j.priority+'</span>';
     }
-    progHtml = '<div class="job-meta-row"><span class="dim">Přidáno '+j.added_at+'</span>' +
-               (badge ? '<span class="dim">·</span>'+badge : '') + '</div>';
+    metaHtml = '<span class="dim">Přidáno '+j.added_at+'</span>' + badge;
     actHtml  = iconBtn('prio', j.jid) + iconBtn('cancel', j.jid);
 
   } else if (j.status === 'done') {
-    const fname = j.final_path ? j.final_path.replace(/\\/g,'/').split('/').pop() : '?';
-    progHtml =
-      '<div class="job-meta-row">' +
-        '<span title="'+esc(j.final_path)+'" style="color:var(--hub-text-dim)">'+esc(fname)+'</span>' +
-        '<span>'+j.total_str+'</span>' +
-        '<span class="dim">za '+j.elapsed_str+'</span>' +
-      '</div>';
+    metaHtml =
+      '<span class="size">'+j.total_str+'</span>' +
+      '<span class="dim">za '+j.elapsed_str+'</span>';
 
   } else if (j.status === 'fail') {
-    progHtml = '<div class="job-meta-row" style="color:var(--hub-raspberry)" title="'+esc(j.error)+'">' +
-               esc(j.error||'neznámá chyba') + '</div>';
+    metaHtml = '<span class="err" title="'+esc(j.error)+'">'+esc(j.error||'neznámá chyba')+'</span>';
     actHtml  = iconBtn('retry', j.jid);
   }
 
+  const mainTip = j.final_path || j.url;
   return '<div class="job-card j-'+j.status+'">' +
-    '<div class="job-head">' +
-      '<span class="job-status-pill"><span class="dot"></span>'+(labels[j.status]||j.status)+'</span>' +
-      '<span class="job-id">#'+j.jid+'</span>' +
-      '<div class="job-actions">'+actHtml+'</div>' +
-    '</div>' +
-    titleHtml +
-    progHtml +
+    '<span class="job-status-pill"><span class="dot"></span>'+(labels[j.status]||j.status)+'</span>' +
+    '<span class="job-id">#'+j.jid+'</span>' +
+    '<div class="job-main" title="'+esc(mainTip)+'">'+titleHtml+'</div>' +
+    '<div class="job-meta-row">'+metaHtml+'</div>' +
+    '<div class="job-actions">'+actHtml+'</div>' +
+    barHtml +
     '</div>';
 }
 
@@ -1027,6 +1070,66 @@ const JOBS_EMPTY_HTML =
     '<div class="empty-title">Žádné joby zatím</div>' +
     '<div class="empty-hint">Přidej URL nahoře a klikni „Stažení"</div>' +
   '</div>';
+
+// ── flicker-free updates ──
+// Rewriting innerHTML every second rebuilt every card, replaying its fade-in
+// animation and resetting the progress bar transition. Instead each card is
+// kept by job id and only the nodes/attributes that actually changed are patched.
+function morph(oldEl, newEl) {
+  if (oldEl.nodeType !== newEl.nodeType || oldEl.nodeName !== newEl.nodeName) {
+    oldEl.replaceWith(newEl);
+    return;
+  }
+  if (oldEl.nodeType === Node.TEXT_NODE) {
+    if (oldEl.nodeValue !== newEl.nodeValue) oldEl.nodeValue = newEl.nodeValue;
+    return;
+  }
+  if (oldEl.nodeType !== Node.ELEMENT_NODE) return;
+  for (const a of Array.from(oldEl.attributes))
+    if (!newEl.hasAttribute(a.name)) oldEl.removeAttribute(a.name);
+  for (const a of Array.from(newEl.attributes))
+    if (oldEl.getAttribute(a.name) !== a.value) oldEl.setAttribute(a.name, a.value);
+  const oldKids = Array.from(oldEl.childNodes), newKids = Array.from(newEl.childNodes);
+  newKids.forEach((nk, i) => {
+    if (i < oldKids.length) morph(oldKids[i], nk);
+    else oldEl.appendChild(nk);
+  });
+  for (let i = newKids.length; i < oldKids.length; i++) oldKids[i].remove();
+}
+
+const _tpl = document.createElement('template');
+function htmlToEl(html) { _tpl.innerHTML = html; return _tpl.content.firstElementChild; }
+
+let jobCards = new Map();   // jid -> card element
+function renderJobs(jobs) {
+  const list = document.getElementById('jobs-list');
+  if (!jobs.length) {
+    if (jobCards.size || !list.querySelector('.empty-state')) list.innerHTML = JOBS_EMPTY_HTML;
+    jobCards = new Map();
+    return;
+  }
+  if (list.querySelector('.empty-state')) { list.textContent = ''; jobCards = new Map(); }
+  const next = new Map();
+  let prev = null;
+  for (const j of jobs) {
+    const fresh = htmlToEl(renderJob(j));
+    let card = jobCards.get(j.jid);
+    if (card) morph(card, fresh); else card = fresh;
+    const want = prev ? prev.nextSibling : list.firstChild;
+    if (want !== card) list.insertBefore(card, want);
+    next.set(j.jid, card);
+    prev = card;
+  }
+  for (const [jid, card] of jobCards) if (!next.has(jid)) card.remove();
+  jobCards = next;
+}
+
+function fmtTotal(b) {
+  b = b || 0;
+  if (b >= 1024 ** 4) return (b / 1024 ** 4).toFixed(2) + ' TB';
+  if (b >= 1024 ** 3) return (b / 1024 ** 3).toFixed(b >= 100 * 1024 ** 3 ? 0 : 1) + ' GB';
+  return Math.round(b / 1024 ** 2) + ' MB';
+}
 
 // ── polling ──
 async function refresh() {
@@ -1039,6 +1142,7 @@ async function refresh() {
     document.getElementById('s-queue').textContent  = s.queued + s.pending;
     document.getElementById('s-done').textContent   = s.done;
     document.getElementById('s-fail').textContent   = s.fail;
+    document.getElementById('s-bytes').textContent  = fmtTotal(s.session_bytes);
 
     // tab title: show download status when active
     const qtot = s.queued + s.pending;
@@ -1061,12 +1165,7 @@ async function refresh() {
       folderReady = true;
     }
 
-    const jobsList = document.getElementById('jobs-list');
-    if (!d.jobs.length) {
-      jobsList.innerHTML = JOBS_EMPTY_HTML;
-    } else {
-      jobsList.innerHTML = d.jobs.map(renderJob).join('');
-    }
+    renderJobs(d.jobs);
     document.getElementById('statusline').textContent =
       s.workers+' slot'+(s.workers===1?'':'y')+' · '+s.concurrent_fragments+' seg.'+(s.auto_adapt?' (auto)':'')+' | Aktualizováno: '+new Date().toLocaleTimeString('cs-CZ');
   } catch(e) {
@@ -1257,6 +1356,9 @@ async def get_state():
             "format":               _d().cfg.get("format", "bv*+ba/b"),
             "out_dir":              str(daemon.out_dir),
             "shutting_down":        daemon._shutting_down,
+            # finished files + what the running downloads already have on disk
+            "session_bytes":        daemon.session_bytes + sum(
+                j.downloaded for j in daemon.jobs.values() if j.status == "downloading"),
         }
 
     return {"stats": stats, "jobs": jobs_list}
@@ -1394,6 +1496,7 @@ async def browse_folder():
         return {"ok": False, "cancelled": True}
     try:
         resolved = daemon.set_out_dir(path)
+        _remember({"download_dir": resolved})
         return {"ok": True, "path": resolved}
     except Exception as e:
         return {"ok": False, "error": str(e)}
