@@ -1,6 +1,7 @@
 # Changelog
 
-## v9.3 — sloty přímo z lišty
+## v9.3 — sloty přímo z lišty + aplikace si pamatuje nastavení
+- **Nastavení přežije restart:** co změníš v UI (sloty, formát, složka, retry, …), se uloží do `settings.json` vedle aplikace a při startu přebije `config.yaml`. Dřív se po restartu všechno vrátilo na hodnoty z `config.yaml`. Ukládají se jen opravdu změněné hodnoty, takže autodetekce ffmpeg zůstává. Návrat k výchozímu = smazat `settings.json`
 - Tlačítka **− / +** u počtu slotů v horní liště: počet paralelních stahování (1–16) jde měnit bez otevírání Nastavení. Přidání slotu hned rozběhne další stahování z fronty, ubrání nechá běžící stahování doběhnout
 
 ## v9.2 — server zase ve vlastním okně

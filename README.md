@@ -54,7 +54,7 @@ Pokud grabber běží na jiném portu, adresa se mění v nastavení rozšířen
 
 ## Konfigurace
 
-Viz [config.yaml](config.yaml) — download složka, počet workerů, formát, timeouty.
+Viz [config.yaml](config.yaml) — download složka, počet workerů, formát, timeouty. Co změníš v UI, si aplikace pamatuje v `settings.json` (vedle aplikace) a má to přednost před `config.yaml`; smazáním souboru se vrátíš k hodnotám z configu.
 
 ## Changelog
 

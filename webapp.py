@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+import json
 import os
 import sys
 import shutil
@@ -1312,9 +1313,44 @@ async def retry_job(req: PrioReq):
     return {"ok": True, "message": daemon.retry_job(req.jid)}
 
 
+# ── zapamatované nastavení ──
+# Co uživatel změní v UI, se ukládá do settings.json vedle state souboru a při
+# startu přebije config.yaml. Ukládají se jen změněné klíče, takže autodetekce
+# (např. ffmpeg) zůstává, dokud ji uživatel sám nepřepíše. Reset = smazat soubor.
+
+PERSISTED_KEYS = set(SetConfigReq.model_fields)
+_settings_path: Path | None = None
+_user_settings: dict = {}
+_settings_lock = threading.Lock()
+
+
+def _load_user_settings(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items() if k in PERSISTED_KEYS and v is not None}
+
+
+def _remember(values: dict) -> None:
+    if _settings_path is None or not values:
+        return
+    with _settings_lock:
+        _user_settings.update(values)
+        try:
+            tmp = _settings_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(_user_settings, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(_settings_path)
+        except OSError:
+            pass
+
+
 @app.post("/api/set_format")
 async def set_format(req: FormatReq):
     _d().set_format(req.fmt)
+    _remember({"format": _d().cfg["format"]})
     return {"ok": True}
 
 
@@ -1322,6 +1358,7 @@ async def set_format(req: FormatReq):
 async def set_outdir(req: SetOutDirReq):
     try:
         resolved = daemon.set_out_dir(req.path)
+        _remember({"download_dir": resolved})
         return {"ok": True, "path": resolved}
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -1388,6 +1425,8 @@ async def get_config():
 @app.post("/api/set_config")
 async def set_config(req: SetConfigReq):
     d = _d()
+    with d.lock:
+        before = dict(d.cfg)
     try:
         if req.download_dir:
             d.set_out_dir(req.download_dir)
@@ -1420,6 +1459,15 @@ async def set_config(req: SetConfigReq):
                 d.cfg["adapt_min_frags"] = max(1, req.adapt_min_frags)
             if req.adapt_max_frags is not None:
                 d.cfg["adapt_max_frags"] = max(1, req.adapt_max_frags)
+            # uložit jen to, co se opravdu změnilo (formulář posílá všechna pole,
+            # i autodetekovaný ffmpeg), a to v podobě, jak to daemon přijal
+            sent = req.model_dump(exclude_none=True)
+            if not req.download_dir:
+                sent.pop("download_dir", None)
+            changed = {k: d.cfg.get(k, v) for k, v in sent.items()}
+            changed = {k: v for k, v in changed.items()
+                       if k in _user_settings or before.get(k) != v}
+        _remember(changed)
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -1501,7 +1549,7 @@ def _own_console_window(port: int) -> None:
 
 
 def main():
-    global daemon
+    global daemon, _settings_path
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.yaml")
@@ -1515,6 +1563,11 @@ def main():
     cfg_path = _resolve_config(args.config)
     cfg = load_config(str(cfg_path))
     data_dir = _data_dir(cfg_path.resolve().parent)
+
+    # nastavení změněné v UI přebije config.yaml
+    _settings_path = data_dir / "settings.json"
+    _user_settings.update(_load_user_settings(_settings_path))
+    cfg.update(_user_settings)
 
     # bundled ffmpeg first, then PATH — a stale path from config is discarded
     cfg["ffmpeg_path"] = resolve_ffmpeg(cfg.get("ffmpeg_path", ""), _base, _exe_dir)

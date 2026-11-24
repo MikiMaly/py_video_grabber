@@ -1,6 +1,8 @@
 # runtime state — private download history
 grabber_state.json
 grabber_state.tmp
+settings.json
+settings.tmp
 
 # downloads folder
 downloads/
