@@ -1,5 +1,8 @@
 # Changelog
 
+## v9.3 — sloty přímo z lišty
+- Tlačítka **− / +** u počtu slotů v horní liště: počet paralelních stahování (1–16) jde měnit bez otevírání Nastavení. Přidání slotu hned rozběhne další stahování z fronty, ubrání nechá běžící stahování doběhnout
+
 ## v9.2 — server zase ve vlastním okně
 - **Fix:** na Windows 11 se aplikace po dvojkliku otevírala ve Windows Terminalu (výchozí terminál), takže na liště byla ikona Terminálu a běžící server nešel poznat. Instance spuštěná dvojklikem se teď sama přesune do klasického konzolového okna (`conhost`) → na liště je zase ikona aplikace
 - Titulek okna `Ultimate Video Downloader · server :8080` (s portem)

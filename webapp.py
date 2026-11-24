@@ -485,6 +485,14 @@ HTML = r"""<!DOCTYPE html>
   .toast.t-info  { border-left-color: var(--hub-aqua); }
 
   .audio-badge { font-family: var(--font-mono); letter-spacing: 0.06em; }
+
+  /* − / + u počtu slotů v liště */
+  .step-btn { width: 22px; height: 22px; display: inline-grid; place-items: center; padding: 0;
+              font: 600 14px/1 var(--font-sans); color: var(--hub-text-dim); cursor: pointer;
+              background: color-mix(in srgb, var(--hub-ink-3) 70%, transparent);
+              border: 1px solid var(--border); border-radius: 7px; transition: background-color .15s, color .15s, border-color .15s; }
+  .step-btn:hover:not(:disabled) { color: var(--hub-mint); background: var(--hub-ink-4); border-color: var(--border-strong); }
+  .step-btn:disabled { opacity: 0.35; cursor: default; }
 </style>
 </head>
 <body>
@@ -528,7 +536,10 @@ HTML = r"""<!DOCTYPE html>
   </button>
   <div class="tabs-nav-right">
     <div class="workers-disp">
-      <span id="workers-val">?</span><span class="stat-lbl">sloty</span>
+      <button class="step-btn" id="workers-dec" onclick="changeWorkers(-1)" title="Ubrat slot" aria-label="Ubrat slot">&minus;</button>
+      <span id="workers-val">?</span>
+      <button class="step-btn" id="workers-inc" onclick="changeWorkers(1)" title="P&#345;idat slot" aria-label="P&#345;idat slot">+</button>
+      <span class="stat-lbl">sloty</span>
       <span class="sep">|</span>
       <span id="frags-val">?</span><span id="adapt-badge" style="display:none;font-size:10px;color:var(--hub-green);padding-left:3px">auto</span><span class="stat-lbl">seg.</span>
     </div>
@@ -861,6 +872,33 @@ async function changeFormat(fmt) {
 }
 
 // ── job actions ──
+// sloty (paralelní stahování) přímo z lišty; ubrání nechá běžící stahování doběhnout
+async function changeWorkers(delta) {
+  const el  = document.getElementById('workers-val');
+  const cur = parseInt(el.textContent) || 1;
+  const n   = Math.max(1, Math.min(16, cur + delta));
+  if (n === cur) return;
+  el.textContent = n;
+  updateWorkerButtons(n);
+  try {
+    const r = await fetch('/api/set_config', { method:'POST', headers:{'Content-Type':'application/json'},
+                                               body: JSON.stringify({max_workers: n}) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error);
+    const inp = document.getElementById('cfg-workers');
+    if (inp) inp.value = n;
+  } catch(e) {
+    el.textContent = cur;
+    updateWorkerButtons(cur);
+    showToast('Sloty se nepodařilo změnit');
+  }
+}
+
+function updateWorkerButtons(n) {
+  document.getElementById('workers-dec').disabled = n <= 1;
+  document.getElementById('workers-inc').disabled = n >= 16;
+}
+
 async function bumpPriority(jid) {
   await fetch('/api/priority', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({jid}) });
 }
@@ -1007,6 +1045,7 @@ async function refresh() {
       ? '(' + s.active + '↓ ' + qtot + '⏳) Ultimate Video Downloader'
       : 'Ultimate Video Downloader';
     document.getElementById('workers-val').textContent = s.workers;
+    updateWorkerButtons(s.workers);
     document.getElementById('frags-val').textContent   = s.concurrent_fragments;
     document.getElementById('adapt-badge').style.display = s.auto_adapt ? '' : 'none';
     document.getElementById('shutdown-banner').style.display = s.shutting_down ? 'inline' : 'none';
